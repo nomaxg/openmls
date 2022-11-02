@@ -281,7 +281,7 @@ Currently, there are two implementations available through the <a href="https://
             key_package
                 .hash_ref(backend.crypto())
                 .expect(&quot;Could not hash KeyPackage.&quot;)
-                .value(),
+                .as_slice(),
             &amp;key_package_bundle,
         )
         .expect(&quot;An unexpected error occurred.&quot;);
@@ -921,7 +921,7 @@ pub enum HpkeAeadType {
 <pre><code class="language-rust no_run noplayground">    Debug, PartialEq, Eq, Clone, Serialize, Deserialize, TlsSerialize, TlsDeserialize, TlsSize,
 )]
 pub struct HpkeCiphertext {
-    pub kem_output: TlsByteVecU16,
+    pub kem_output: VLBytes,
 </code></pre>
 <pre><code class="language-rust no_run noplayground">/// Helper holding a (private, public) key pair as byte vectors.
 #[derive(Debug, Clone)]
@@ -963,6 +963,7 @@ Further syntax checks are applied for the latter case once the message is decryp
 <tr><td><code>ValSem008</code></td><td>Membership tag verification</td><td>✅</td><td>✅</td><td><code>openmls/src/group/tests/test_framing_validation.rs</code></td></tr>
 <tr><td><code>ValSem009</code></td><td>Confirmation tag presence</td><td>✅</td><td>✅</td><td><code>openmls/src/group/tests/test_framing_validation.rs</code></td></tr>
 <tr><td><code>ValSem010</code></td><td>Signature verification</td><td>✅</td><td>✅</td><td><code>openmls/src/group/tests/test_framing_validation.rs</code></td></tr>
+<tr><td><code>ValSem011</code></td><td>MLSCiphertextContent padding must be all-zero</td><td>✅</td><td>✅</td><td><code>openmls/src/group/tests/test_framing.rs</code></td></tr>
 </tbody></table>
 </div>
 <h3 id="semantic-validation-of-proposals-covered-by-a-commit"><a class="header" href="#semantic-validation-of-proposals-covered-by-a-commit">Semantic validation of proposals covered by a Commit</a></h3>
