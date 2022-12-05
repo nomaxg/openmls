@@ -484,7 +484,48 @@
 <span id="484">484</span>
 <span id="485">485</span>
 <span id="486">486</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::treesync::errors::TreeSyncAddLeaf;
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::ciphersuite::signable::Verifiable;
+<span class="kw">use </span><span class="kw">crate</span>::treesync::errors::TreeSyncAddLeaf;
+<span class="kw">use </span><span class="kw">crate</span>::treesync::node::leaf_node::{
+    LeafNodeTbs, OpenMlsLeafNode, TreeInfoTbs, VerifiableLeafNodeTbs,
+};
 <span class="kw">use </span><span class="kw">crate</span>::treesync::{diff::StagedTreeSyncDiff, treekem::DecryptPathParams};
 
 <span class="kw">use </span><span class="kw">super</span>::proposals::{
@@ -534,14 +575,13 @@
     ///  - ValSem242
     ///  - ValSem243
     ///  - ValSem244
-    ///  - ValSem245
     /// Returns an error if the given commit was sent by the owner of this
     /// group.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>stage_commit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         mls_plaintext: <span class="kw-2">&amp;</span>MlsPlaintext,
         proposal_store: <span class="kw-2">&amp;</span>ProposalStore,
-        own_key_packages: <span class="kw-2">&amp;</span>[KeyPackageBundle],
+        own_leaf_nodes: <span class="kw-2">&amp;</span>[OpenMlsLeafNode],
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;StagedCommit, StageCommitError&gt; {
         <span class="comment">// Extract the sender of the Commit message
@@ -561,11 +601,7 @@
         </span><span class="kw">let </span>sender = mls_plaintext.sender();
 
         <span class="kw">if let </span>Sender::Member(member) = sender {
-            <span class="kw">if </span>member
-                == <span class="self">self
-                    </span>.key_package_ref()
-                    .ok_or_else(|| LibraryError::custom(<span class="string">&quot;Expected own key package reference&quot;</span>))<span class="question-mark">?
-            </span>{
+            <span class="kw">if </span><span class="kw-2">*</span>member == <span class="self">self</span>.own_leaf_index() {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::OwnCommit);
             }
         }
@@ -579,6 +615,18 @@
         <span class="kw">let </span>received_confirmation_tag = mls_plaintext
             .confirmation_tag()
             .ok_or(StageCommitError::ConfirmationTagMissing)<span class="question-mark">?</span>;
+
+        <span class="comment">// ValSem244: External Commit, There MUST NOT be any referenced proposals.
+        </span><span class="kw">if </span><span class="kw-2">*</span>sender == Sender::NewMemberCommit
+            &amp;&amp; commit
+                .proposals
+                .iter()
+                .any(|proposal| <span class="macro">matches!</span>(proposal, ProposalOrRef::Reference(<span class="kw">_</span>)))
+        {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::ExternalCommitValidation(
+                ExternalCommitValidationError::ReferencedProposal,
+            ));
+        }
 
         <span class="comment">// Build a queue with all proposals from the Commit and check that we have all
         // of the proposals by reference locally
@@ -595,10 +643,10 @@
             FromCommittedProposalsError::SelfRemoval =&gt; StageCommitError::AttemptedSelfRemoval,
         })<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>commit_update_key_package = commit
+        <span class="kw">let </span>commit_update_leaf_node = commit
             .path()
             .as_ref()
-            .map(|update_path| update_path.leaf_key_package().clone());
+            .map(|update_path| update_path.leaf_node().clone());
 
         <span class="comment">// Validate the staged proposals by doing the following checks:
         // ValSem100
@@ -614,26 +662,28 @@
         </span><span class="self">self</span>.validate_remove_proposals(<span class="kw-2">&amp;</span>proposal_queue)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>public_key_set = <span class="kw">match </span>sender {
-            Sender::Member(hash_ref) =&gt; {
+            Sender::Member(leaf_index) =&gt; {
                 <span class="comment">// ValSem109
                 // ValSem110
                 // ValSem111
                 // ValSem112
-                </span><span class="self">self</span>.validate_update_proposals(<span class="kw-2">&amp;</span>proposal_queue, hash_ref)<span class="question-mark">?
+                </span><span class="self">self</span>.validate_update_proposals(<span class="kw-2">&amp;</span>proposal_queue, <span class="kw-2">*</span>leaf_index)<span class="question-mark">?
             </span>}
             Sender::External(<span class="kw">_</span>) =&gt; {
                 <span class="comment">// A commit cannot be issued by a pre-configured sender.
                 </span><span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::SenderTypeExternal);
             }
-            Sender::NewMember =&gt; {
+            Sender::NewMemberProposal =&gt; {
+                <span class="comment">// A commit cannot be issued by a `NewMemberProposal` sender.
+                </span><span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::SenderTypeNewMemberProposal);
+            }
+            Sender::NewMemberCommit =&gt; {
                 <span class="comment">// ValSem240: External Commit, inline Proposals: There MUST be at least one ExternalInit proposal.
                 // ValSem241: External Commit, inline Proposals: There MUST be at most one ExternalInit proposal.
-                // ValSem242: External Commit, inline Proposals: There MUST NOT be any Add proposals.
-                // ValSem243: External Commit, inline Proposals: There MUST NOT be any Update proposals.
-                // ValSem244: External Commit, inline Remove Proposal: The identity and the endpoint_id of the removed
+                // ValSem242: External Commit must only cover inline proposal in allowlist (ExternalInit, Remove, PreSharedKey)
+                // ValSem243: External Commit, inline Remove Proposal: The identity and the endpoint_id of the removed
                 //            leaf are identical to the ones in the path KeyPackage.
-                // ValSem245: External Commit, referenced Proposals: There MUST NOT be any ExternalInit proposals.
-                </span><span class="self">self</span>.validate_external_commit(<span class="kw-2">&amp;</span>proposal_queue, commit_update_key_package.as_ref())<span class="question-mark">?</span>;
+                </span><span class="self">self</span>.validate_external_commit(<span class="kw-2">&amp;</span>proposal_queue, commit_update_leaf_node.as_ref())<span class="question-mark">?</span>;
                 <span class="comment">// Since there are no update proposals in an External Commit we have no public keys to return
                 </span>HashSet::new()
             }
@@ -643,20 +693,19 @@
         </span><span class="kw">let </span><span class="kw-2">mut </span>diff = <span class="self">self</span>.treesync().empty_diff()<span class="question-mark">?</span>;
 
         <span class="kw">let </span>apply_proposals_values = <span class="self">self
-            </span>.apply_proposals(<span class="kw-2">&amp;mut </span>diff, backend, <span class="kw-2">&amp;</span>proposal_queue, own_key_packages)
+            </span>.apply_proposals(<span class="kw-2">&amp;mut </span>diff, backend, <span class="kw-2">&amp;</span>proposal_queue, own_leaf_nodes)
             .map_err(|<span class="kw">_</span>| StageCommitError::OwnKeyNotFound)<span class="question-mark">?</span>;
 
         <span class="comment">// Now we can actually look at the public keys as they might have changed.
         </span><span class="kw">let </span>sender_index = <span class="kw">match </span>sender {
-            Sender::Member(hash_ref) =&gt; {
+            Sender::Member(leaf_index) =&gt; {
                 <span class="comment">// Own commits have to be merged directly instead of staging them.
-                // We can&#39;t check for this explicitly. But if it&#39;s an own commit
-                // we won&#39;t be able to get the sender index because the kpr is our
-                // own new one that&#39;s only in the staged commit.
-                </span><span class="self">self</span>.sender_index(hash_ref)
-                    .map_err(|<span class="kw">_</span>| StageCommitError::InconsistentSenderIndex)<span class="question-mark">?
-            </span>}
-            Sender::NewMember =&gt; diff.free_leaf_index()<span class="question-mark">?</span>,
+                </span><span class="kw">if </span>leaf_index == <span class="kw-2">&amp;</span><span class="self">self</span>.own_leaf_index() {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::InconsistentSenderIndex);
+                }
+                <span class="kw-2">*</span>leaf_index
+            }
+            Sender::NewMemberCommit =&gt; diff.free_leaf_index()<span class="question-mark">?</span>,
             <span class="kw">_ </span>=&gt; {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::SenderTypeExternal);
             }
@@ -668,42 +717,67 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(StagedCommit::new(
                 proposal_queue,
                 StagedCommitState::SelfRemoved(Box::new(staged_diff)),
-                commit_update_key_package,
+                commit_update_leaf_node,
             ));
         }
 
         <span class="comment">// Determine if Commit has a path
         </span><span class="kw">let </span>commit_secret = <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = commit.path.clone() {
-            <span class="comment">// Verify KeyPackage and MlsPlaintext membership tag
+            <span class="comment">// Verify the leaf node and MlsPlaintext membership tag
             // Note that the signature must have been verified already.
             // TODO #106: Support external members
-            </span><span class="kw">let </span>kp = path.leaf_key_package();
-            <span class="kw">if </span>kp.verify(backend).is_err() {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::PathKeyPackageVerificationFailure);
+            </span><span class="kw">let </span>leaf_node = path.leaf_node();
+            <span class="comment">// TODO: The clone here is unnecessary. But the leaf node structs are
+            //       already too complex. This should be cleaned up in a follow
+            //       up.
+            </span><span class="kw">let </span>tbs = LeafNodeTbs::from(
+                leaf_node.clone(),
+                TreeInfoTbs::commit(<span class="self">self</span>.group_id().clone(), sender_index),
+            );
+            <span class="kw">let </span>verifiable_leaf_node = VerifiableLeafNodeTbs {
+                tbs: <span class="kw-2">&amp;</span>tbs,
+                signature: leaf_node.signature(),
+            };
+            <span class="kw">if </span>verifiable_leaf_node
+                .verify_no_out(backend, leaf_node.credential())
+                .is_err()
+            {
+                <span class="macro">debug_assert!</span>(
+                    <span class="bool-val">false</span>,
+                    <span class="string">&quot;Verification failed of leaf node in commit path.\n\
+                     Leaf node identity: {:?} ({})&quot;</span>,
+                    leaf_node.credential().identity(),
+                    String::from_utf8(leaf_node.credential().identity().to_vec())
+                        .unwrap_or_default()
+                );
+                <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::PathLeafNodeVerificationFailure);
             }
             <span class="kw">let </span>serialized_context = <span class="self">self
                 </span>.group_context
                 .tls_serialize_detached()
                 .map_err(LibraryError::missing_bound_check)<span class="question-mark">?</span>;
 
-            <span class="kw">let </span>(key_package, update_path_nodes) = path.into_parts();
+            <span class="kw">let </span>(leaf_node, update_path_nodes) = path.into_parts();
 
             <span class="comment">// Make sure that the new path key package is valid
-            </span><span class="self">self</span>.validate_path_key_package(sender_index, <span class="kw-2">&amp;</span>key_package, public_key_set, sender)<span class="question-mark">?</span>;
+            </span><span class="self">self</span>.validate_path_key_package(sender_index, <span class="kw-2">&amp;</span>leaf_node, public_key_set, sender)<span class="question-mark">?</span>;
 
-            <span class="comment">// If the committer is a `NewMember`, we have to add the leaf to
+            <span class="comment">// If the committer is a `NewMemberCommit`, we have to add the leaf to
             // the tree before we can apply or even decrypt an update path.
             // While `apply_received_update_path` will happily update a
             // blank leaf, we still have to call `add_leaf` here in case
             // there are no blanks and the new member extended the tree to
             // fit in.
             </span><span class="kw">if </span>apply_proposals_values.external_init_secret_option.is_some() {
-                <span class="kw">let </span>sender_leaf_index = diff
-                    .add_leaf(key_package.clone(), backend.crypto())
-                    .map_err(|e| <span class="kw">match </span>e {
-                        TreeSyncAddLeaf::LibraryError(e) =&gt; e.into(),
-                        TreeSyncAddLeaf::TreeFull =&gt; StageCommitError::TooManyNewMembers,
-                    })<span class="question-mark">?</span>;
+                <span class="comment">// TODO: Can we do without the clone here?
+                //       The leaf node is always replaced in apply_received_update_path
+                //       below, which isn&#39;t necessary. This should be refactored.
+                </span><span class="kw">let </span>sender_leaf_index =
+                    diff.add_leaf(leaf_node.clone().into())
+                        .map_err(|e| <span class="kw">match </span>e {
+                            TreeSyncAddLeaf::LibraryError(e) =&gt; e.into(),
+                            TreeSyncAddLeaf::TreeFull =&gt; StageCommitError::TooManyNewMembers,
+                        })<span class="question-mark">?</span>;
                 <span class="comment">// The new member should have the same index as the claimed sender index.
                 </span><span class="kw">if </span>sender_leaf_index != sender_index {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::InconsistentSenderIndex);
@@ -727,7 +801,7 @@
                 backend,
                 ciphersuite,
                 sender_index,
-                key_package,
+                leaf_node,
                 plain_path,
             )<span class="question-mark">?</span>;
             commit_secret
@@ -759,7 +833,7 @@
             ciphersuite,
             backend,
             <span class="comment">// It is ok to use return a library error here, because we know the MlsPlaintext contains a Commit
-            </span><span class="kw-2">&amp;</span>MlsPlaintextCommitContent::try_from(mls_plaintext)
+            </span><span class="kw-2">&amp;</span>ConfirmedTranscriptHashInput::try_from(mls_plaintext)
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Could not convert commit content&quot;</span>))<span class="question-mark">?</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.interim_transcript_hash,
         )<span class="question-mark">?</span>;
@@ -774,11 +848,8 @@
         );
 
         <span class="comment">// Prepare the PskSecret
-        </span><span class="kw">let </span>psk_secret = PskSecret::new(
-            ciphersuite,
-            backend,
-            apply_proposals_values.presharedkeys.psks(),
-        )<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>psk_secret =
+            PskSecret::new(ciphersuite, backend, <span class="kw-2">&amp;</span>apply_proposals_values.presharedkeys)<span class="question-mark">?</span>;
 
         <span class="comment">// Create key schedule
         </span><span class="kw">let </span><span class="kw-2">mut </span>key_schedule = KeySchedule::init(ciphersuite, backend, joiner_secret, psk_secret)<span class="question-mark">?</span>;
@@ -794,7 +865,7 @@
             .epoch_secrets(backend)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Using the key schedule in the wrong state&quot;</span>))<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>mls_plaintext_commit_auth_data = MlsPlaintextCommitAuthData::try_from(mls_plaintext)
+        <span class="kw">let </span>mls_plaintext_commit_auth_data = InterimTranscriptHashInput::try_from(mls_plaintext)
             .map_err(|<span class="kw">_</span>| {
                 <span class="macro">log::error!</span>(<span class="string">&quot;Confirmation tag is missing in commit. This should be unreachable because we verified the tag before.&quot;</span>);
                 StageCommitError::ConfirmationTagMissing
@@ -817,7 +888,10 @@
             <span class="macro">log::error!</span>(<span class="string">&quot;Confirmation tag mismatch&quot;</span>);
             <span class="macro">log_crypto!</span>(trace, <span class="string">&quot;  Got:      {:x?}&quot;</span>, received_confirmation_tag);
             <span class="macro">log_crypto!</span>(trace, <span class="string">&quot;  Expected: {:x?}&quot;</span>, own_confirmation_tag);
-            <span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::ConfirmationTagMismatch);
+            <span class="comment">// TODO: We have tests expecting this error.
+            //       They need to be rewritten.
+            // debug_assert!(false, &quot;Confirmation tag mismatch&quot;);
+            </span><span class="kw">return </span><span class="prelude-val">Err</span>(StageCommitError::ConfirmationTagMismatch);
         }
 
         <span class="kw">let </span>(provisional_group_epoch_secrets, provisional_message_secrets) =
@@ -843,7 +917,7 @@
         <span class="prelude-val">Ok</span>(StagedCommit::new(
             proposal_queue,
             staged_commit_state,
-            commit_update_key_package,
+            commit_update_leaf_node,
         ))
     }
 
@@ -892,7 +966,7 @@
 </span><span class="kw">pub struct </span>StagedCommit {
     staged_proposal_queue: ProposalQueue,
     state: StagedCommitState,
-    commit_update_key_package: <span class="prelude-ty">Option</span>&lt;KeyPackage&gt;,
+    commit_update_leaf_node: <span class="prelude-ty">Option</span>&lt;LeafNode&gt;,
 }
 
 <span class="kw">impl </span>StagedCommit {
@@ -901,12 +975,12 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         staged_proposal_queue: ProposalQueue,
         state: StagedCommitState,
-        commit_update_key_package: <span class="prelude-ty">Option</span>&lt;KeyPackage&gt;,
+        commit_update_leaf_node: <span class="prelude-ty">Option</span>&lt;LeafNode&gt;,
     ) -&gt; <span class="self">Self </span>{
         StagedCommit {
             staged_proposal_queue,
             state,
-            commit_update_key_package,
+            commit_update_leaf_node,
         }
     }
 
@@ -930,10 +1004,10 @@
         <span class="self">self</span>.staged_proposal_queue.psk_proposals()
     }
 
-    <span class="doccomment">/// Returns an optional key package from the Commit&#39;s update path.
-    /// A key package is returned for full and empty Commits, but not for partial Commits.
-    </span><span class="kw">pub fn </span>commit_update_key_package(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>KeyPackage&gt; {
-        <span class="self">self</span>.commit_update_key_package.as_ref()
+    <span class="doccomment">/// Returns an optional leaf node from the Commit&#39;s update path.
+    /// A leaf node is returned for full and empty Commits, but not for partial Commits.
+    </span><span class="kw">pub fn </span>commit_update_key_package(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>LeafNode&gt; {
+        <span class="self">self</span>.commit_update_leaf_node.as_ref()
     }
 
     <span class="doccomment">/// Returns `true` if the member was removed through a proposal covered by this Commit message

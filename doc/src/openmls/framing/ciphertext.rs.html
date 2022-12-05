@@ -475,6 +475,12 @@
 <span id="475">475</span>
 <span id="476">476</span>
 <span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
 </pre><pre class="rust"><code><span class="kw">use </span>openmls_traits::{types::Ciphersuite, OpenMlsCryptoProvider};
 <span class="kw">use </span>std::io::Write;
 <span class="kw">use </span>tls_codec::{
@@ -482,8 +488,9 @@
     TlsSize,
 };
 
+<span class="kw">use </span><span class="kw">super</span>::codec::deserialize_ciphertext_content;
+
 <span class="kw">use crate</span>::{
-    ciphersuite::hash_ref::{HashReference, KeyPackageRef},
     error::LibraryError,
     tree::{
         index::SecretTreeLeafIndex, secret_tree::SecretType,
@@ -514,7 +521,7 @@
     group_id: GroupId,
     epoch: GroupEpoch,
     content_type: ContentType,
-    authenticated_data: TlsByteVecU32,
+    authenticated_data: VLBytes,
     encrypted_sender_data: TlsByteVecU8,
     ciphertext: TlsByteVecU32,
 }
@@ -531,7 +538,7 @@
         group_id: GroupId,
         epoch: GroupEpoch,
         content_type: ContentType,
-        authenticated_data: TlsByteVecU32,
+        authenticated_data: VLBytes,
         encrypted_sender_data: TlsByteVecU8,
         ciphertext: TlsByteVecU32,
     ) -&gt; <span class="self">Self </span>{
@@ -561,11 +568,6 @@
         </span><span class="kw">if </span>mls_plaintext.wire_format() != WireFormat::MlsCiphertext {
             <span class="kw">return </span><span class="prelude-val">Err</span>(MessageEncryptionError::WrongWireFormat);
         }
-        <span class="comment">// Check that the plaintext has the right sender type
-        </span><span class="kw">let </span>hash_ref = <span class="kw">match </span>mls_plaintext.sender() {
-            Sender::Member(hash_ref) =&gt; hash_ref,
-            <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(MessageEncryptionError::SenderError(SenderError::NotAMember)),
-        };
         <span class="comment">// Serialize the content AAD
         </span><span class="kw">let </span>mls_ciphertext_content_aad = MlsCiphertextContentAad {
             group_id: header.group_id.clone(),
@@ -621,7 +623,16 @@
         </span><span class="kw">let </span>mls_sender_data_aad_bytes = mls_sender_data_aad
             .tls_serialize_detached()
             .map_err(LibraryError::missing_bound_check)<span class="question-mark">?</span>;
-        <span class="kw">let </span>sender_data = MlsSenderData::from_sender(hash_ref, generation, reuse_guard);
+        <span class="kw">let </span>leaf_index = mls_plaintext
+            .sender()
+            .as_member()
+            .ok_or(MessageEncryptionError::SenderError(SenderError::NotAMember))<span class="question-mark">?</span>;
+        <span class="kw">let </span>sender_data = MlsSenderData::from_sender(
+            <span class="comment">// XXX: #106 This will fail for messages with a non-member sender.
+            </span>leaf_index,
+            generation,
+            reuse_guard,
+        );
         <span class="comment">// Encrypt the sender data
         </span><span class="kw">let </span>encrypted_sender_data = sender_data_key
             .aead_seal(
@@ -723,11 +734,14 @@
             <span class="string">&quot;  Successfully decrypted MlsPlaintext bytes: {:x?}&quot;</span>,
             mls_ciphertext_content_bytes
         );
-        MlsCiphertextContent::tls_deserialize(<span class="kw-2">&amp;mut </span>mls_ciphertext_content_bytes.as_slice())
-            .map_err(|<span class="kw">_</span>| MessageDecryptionError::MalformedContent)
+        deserialize_ciphertext_content(
+            <span class="kw-2">&amp;mut </span>mls_ciphertext_content_bytes.as_slice(),
+            <span class="self">self</span>.content_type(),
+        )
+        .map_err(|<span class="kw">_</span>| MessageDecryptionError::MalformedContent)
     }
 
-    <span class="doccomment">/// This function decrypts an [`MlsCiphertext`] into an [`VerifiableMlsPlaintext`].
+    <span class="doccomment">/// This function decrypts an [`MlsCiphertext`] into an [`VerifiableMlsAuthContent`].
     /// In order to get an [`MlsPlaintext`] the result must be verified.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>to_plaintext(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -737,7 +751,7 @@
         sender_index: SecretTreeLeafIndex,
         sender_ratchet_configuration: <span class="kw-2">&amp;</span>SenderRatchetConfiguration,
         sender_data: MlsSenderData,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;VerifiableMlsPlaintext, MessageDecryptionError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;VerifiableMlsAuthContent, MessageDecryptionError&gt; {
         <span class="kw">let </span>secret_type = SecretType::from(<span class="kw-2">&amp;</span><span class="self">self</span>.content_type);
         <span class="comment">// Extract generation and key material for encryption
         </span><span class="kw">let </span>(ratchet_key, ratchet_nonce) = message_secrets
@@ -766,8 +780,8 @@
             mls_ciphertext_content.content
         );
 
-        <span class="kw">let </span>verifiable = VerifiableMlsPlaintext::new(
-            MlsPlaintextTbs::new(
+        <span class="kw">let </span>verifiable = VerifiableMlsAuthContent::new(
+            MlsContentTbs::new(
                 <span class="self">self</span>.wire_format,
                 <span class="self">self</span>.group_id.clone(),
                 <span class="self">self</span>.epoch,
@@ -775,8 +789,7 @@
                 <span class="self">self</span>.authenticated_data.clone(),
                 mls_ciphertext_content.content,
             ),
-            mls_ciphertext_content.signature,
-            mls_ciphertext_content.confirmation_tag,
+            mls_ciphertext_content.auth,
             <span class="prelude-val">None</span>, <span class="comment">/* MlsCiphertexts don&#39;t carry along the membership tag. */
         </span>);
         <span class="prelude-val">Ok</span>(verifiable)
@@ -794,9 +807,8 @@
         padding_size: usize,
         mac_len: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, tls_codec::Error&gt; {
-        <span class="kw">let </span>plaintext_length = mls_plaintext.content().tls_serialized_len()
-            + mls_plaintext.signature().tls_serialized_len()
-            + mls_plaintext.confirmation_tag().tls_serialized_len();
+        <span class="kw">let </span>plaintext_length = mls_plaintext.content().serialized_len_without_type()
+            + mls_plaintext.auth().tls_serialized_len();
 
         <span class="kw">let </span>padding_length = <span class="kw">if </span>padding_size &gt; <span class="number">0 </span>{
             <span class="comment">// Calculate padding block size.
@@ -811,9 +823,10 @@
         <span class="comment">// Persist all initial fields manually (avoids cloning them)
         </span><span class="kw">let </span>buffer = <span class="kw-2">&amp;mut </span>Vec::with_capacity(plaintext_length + padding_length);
 
-        mls_plaintext.content().tls_serialize(buffer)<span class="question-mark">?</span>;
-        mls_plaintext.signature().tls_serialize(buffer)<span class="question-mark">?</span>;
-        mls_plaintext.confirmation_tag().tls_serialize(buffer)<span class="question-mark">?</span>;
+        <span class="comment">// The `content` field is serialized without the `content_type`, which
+        // is not part of the struct as per MLS spec.
+        </span>mls_plaintext.content().serialize_without_type(buffer)<span class="question-mark">?</span>;
+        mls_plaintext.auth().tls_serialize(buffer)<span class="question-mark">?</span>;
         <span class="comment">// Note: The `tls_codec::Serialize` implementation for `&amp;[u8]` prepends the length.
         // We do not want this here and thus use the &quot;raw&quot; `write_all` method.
         </span>buffer
@@ -862,20 +875,16 @@
 </span><span class="attribute">#[derive(Clone, TlsDeserialize, TlsSerialize, TlsSize)]
 #[cfg_attr(test, derive(Debug))]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsSenderData {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) sender: KeyPackageRef,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) leaf_index: u32,
     <span class="kw">pub</span>(<span class="kw">crate</span>) generation: u32,
     <span class="kw">pub</span>(<span class="kw">crate</span>) reuse_guard: ReuseGuard,
 }
 
 <span class="kw">impl </span>MlsSenderData {
     <span class="doccomment">/// Build new [`MlsSenderData`] for a [`Sender`].
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>from_sender(
-        hash_ref: <span class="kw-2">&amp;</span>HashReference,
-        generation: u32,
-        reuse_guard: ReuseGuard,
-    ) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>from_sender(leaf_index: u32, generation: u32, reuse_guard: ReuseGuard) -&gt; <span class="self">Self </span>{
         MlsSenderData {
-            sender: hash_ref.clone(),
+            leaf_index,
             generation,
             reuse_guard,
         }
@@ -926,9 +935,12 @@
 /// ```
 </span><span class="attribute">#[derive(Debug, Clone)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsCiphertextContent {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) content: MlsContentBody,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) signature: Signature,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) confirmation_tag: <span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;,
+    <span class="comment">// The `content` field is serialized and deserialized manually without the
+    // `content_type`, which is not part of the struct as per MLS spec. See the
+    // implementation of `TlsSerialize` for `MlsCiphertextContent`, as well as
+    // `deserialize_ciphertext_content`.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) content: MlsContentBody,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) auth: MlsContentAuthData,
     <span class="doccomment">/// Length of the all-zero padding.
     ///
     /// We do not retain any bytes here to avoid the need to

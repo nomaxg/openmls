@@ -273,17 +273,21 @@
 <span id="273">273</span>
 <span id="274">274</span>
 <span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
 </pre><pre class="rust"><code><span class="kw">use </span>tls_codec::{Deserialize, Serialize, Size, TlsByteVecU32, TlsByteVecU8};
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::io::{Read, Write};
 
-<span class="kw">impl </span>Deserialize <span class="kw">for </span>VerifiableMlsPlaintext {
+<span class="kw">impl </span>Deserialize <span class="kw">for </span>VerifiableMlsAuthContent {
     <span class="kw">fn </span>tls_deserialize&lt;R: Read&gt;(bytes: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, tls_codec::Error&gt; {
         <span class="kw">let </span>wire_format = WireFormat::tls_deserialize(bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>content: MlsContent = MlsContent::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>signature = Signature::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>confirmation_tag = <span class="prelude-ty">Option</span>::&lt;ConfirmationTag&gt;::tls_deserialize(bytes)<span class="question-mark">?</span>;
+        <span class="kw">let </span>auth = deserialize_content_auth_data(bytes, content.body.content_type())<span class="question-mark">?</span>;
         <span class="kw">let </span>membership_tag = <span class="prelude-ty">Option</span>::&lt;MembershipTag&gt;::tls_deserialize(bytes)<span class="question-mark">?</span>;
 
         <span class="comment">// ValSem001: Check the wire format
@@ -293,8 +297,8 @@
             ));
         }
 
-        <span class="kw">let </span>verifiable = VerifiableMlsPlaintext::new(
-            MlsPlaintextTbs::new(
+        <span class="kw">let </span>verifiable = VerifiableMlsAuthContent::new(
+            MlsContentTbs::new(
                 wire_format,
                 content.group_id,
                 content.epoch,
@@ -302,8 +306,7 @@
                 content.authenticated_data,
                 content.body,
             ),
-            signature,
-            confirmation_tag,
+            auth,
             membership_tag,
         );
 
@@ -311,95 +314,107 @@
     }
 }
 
-<span class="kw">impl </span>Size <span class="kw">for </span>VerifiableMlsPlaintext {
+<span class="kw">impl </span>Size <span class="kw">for </span>VerifiableMlsAuthContent {
     <span class="attribute">#[inline]
     </span><span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.tbs.wire_format.tls_serialized_len()
-            + <span class="self">self</span>.tbs.group_id.tls_serialized_len()
-            + <span class="self">self</span>.tbs.epoch.tls_serialized_len()
-            + <span class="self">self</span>.tbs.sender.tls_serialized_len()
-            + <span class="self">self</span>.tbs.authenticated_data.tls_serialized_len()
-            + <span class="self">self</span>.tbs.body.tls_serialized_len()
-            + <span class="self">self</span>.signature.tls_serialized_len()
-            + <span class="self">self</span>.confirmation_tag.tls_serialized_len()
+            + <span class="self">self</span>.tbs.content.tls_serialized_len()
+            + <span class="self">self</span>.auth.tls_serialized_len()
             + <span class="self">self</span>.membership_tag.tls_serialized_len()
     }
 }
 
-<span class="kw">impl </span>Serialize <span class="kw">for </span>VerifiableMlsPlaintext {
+<span class="kw">impl </span>Serialize <span class="kw">for </span>VerifiableMlsAuthContent {
     <span class="kw">fn </span>tls_serialize&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, tls_codec::Error&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>written = <span class="self">self</span>.tbs.wire_format.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.tbs.group_id.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.tbs.epoch.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.tbs.sender.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.tbs.authenticated_data.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.tbs.body.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.signature.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.confirmation_tag.tls_serialize(writer)<span class="question-mark">?</span>;
+        written += <span class="self">self</span>.tbs.content.tls_serialize(writer)<span class="question-mark">?</span>;
+        written += <span class="self">self</span>.auth.tls_serialize(writer)<span class="question-mark">?</span>;
         <span class="self">self</span>.membership_tag
             .tls_serialize(writer)
             .map(|l| l + written)
     }
 }
 
-<span class="comment">// This might get refactored with the TLS codec refactoring, just suppressing the warning for now
-</span><span class="attribute">#[allow(clippy::too_many_arguments)]
-</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>serialize_plaintext_tbs&lt;<span class="lifetime">&#39;a</span>, W: Write&gt;(
-    serialized_context: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;&gt;,
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>serialize_plaintext_tbs&lt;<span class="lifetime">&#39;a</span>, W: Write&gt;(
     wire_format: WireFormat,
-    group_id: <span class="kw-2">&amp;</span>GroupId,
-    epoch: <span class="kw-2">&amp;</span>GroupEpoch,
-    sender: <span class="kw-2">&amp;</span>Sender,
-    authenticated_data: <span class="kw-2">&amp;</span>TlsByteVecU32,
-    payload: <span class="kw-2">&amp;</span>MlsContentBody,
+    content: <span class="kw-2">&amp;</span>MlsContent,
+    serialized_context: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;&gt;,
     buffer: <span class="kw-2">&amp;mut </span>W,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;usize, tls_codec::Error&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>written = <span class="kw">if let </span><span class="prelude-val">Some</span>(serialized_context) = serialized_context.into() {
+    <span class="kw">let </span><span class="kw-2">mut </span>written = wire_format.tls_serialize(buffer)<span class="question-mark">?</span>;
+    written += content.tls_serialize(buffer)<span class="question-mark">?</span>;
+    written += <span class="kw">if let </span><span class="prelude-val">Some</span>(serialized_context) = serialized_context.into() {
         <span class="comment">// Only a member should have a context.
-        </span><span class="macro">debug_assert!</span>(<span class="macro">matches!</span>(sender, Sender::Member(<span class="kw">_</span>)));
+        </span><span class="macro">debug_assert!</span>(<span class="macro">matches!</span>(content.sender, Sender::Member(<span class="kw">_</span>)));
         buffer.write(serialized_context)<span class="question-mark">?
     </span>} <span class="kw">else </span>{
         <span class="number">0
     </span>};
-    written += wire_format.tls_serialize(buffer)<span class="question-mark">?</span>;
-    written += group_id.tls_serialize(buffer)<span class="question-mark">?</span>;
-    written += epoch.tls_serialize(buffer)<span class="question-mark">?</span>;
-    written += sender.tls_serialize(buffer)<span class="question-mark">?</span>;
-    written += authenticated_data.tls_serialize(buffer)<span class="question-mark">?</span>;
-    payload.tls_serialize(buffer).map(|l| l + written)
+    <span class="prelude-val">Ok</span>(written)
 }
 
-<span class="kw">impl </span>Size <span class="kw">for </span>MlsPlaintextTbs {
+<span class="kw">impl </span>Size <span class="kw">for </span>MlsContentTbs {
     <span class="attribute">#[inline]
     </span><span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="kw">let </span>context_len = <span class="kw">if let </span><span class="prelude-val">Some</span>(serialized_context) = <span class="kw-2">&amp;</span><span class="self">self</span>.serialized_context {
-            serialized_context.len()
-        } <span class="kw">else </span>{
-            <span class="number">0
-        </span>};
-        context_len
-            + <span class="self">self</span>.wire_format.tls_serialized_len()
-            + <span class="self">self</span>.group_id.tls_serialized_len()
-            + <span class="self">self</span>.epoch.tls_serialized_len()
-            + <span class="self">self</span>.sender.tls_serialized_len()
-            + <span class="self">self</span>.authenticated_data.tls_serialized_len()
-            + <span class="self">self</span>.body.tls_serialized_len()
+        <span class="self">self</span>.wire_format.tls_serialized_len()
+            + <span class="self">self</span>.content.tls_serialized_len()
+            + <span class="kw">if let </span><span class="prelude-val">Some</span>(serialized_context) = <span class="kw-2">&amp;</span><span class="self">self</span>.serialized_context {
+                serialized_context.tls_serialized_len()
+            } <span class="kw">else </span>{
+                <span class="number">0
+            </span>}
     }
 }
 
-<span class="kw">impl </span>Serialize <span class="kw">for </span>MlsPlaintextTbs {
+<span class="kw">impl </span>Serialize <span class="kw">for </span>MlsContentTbs {
     <span class="kw">fn </span>tls_serialize&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, tls_codec::Error&gt; {
         serialize_plaintext_tbs(
-            <span class="self">self</span>.serialized_context.as_deref(),
             <span class="self">self</span>.wire_format,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.group_id,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.epoch,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.sender,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.authenticated_data,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.body,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.content,
+            <span class="self">self</span>.serialized_context.as_deref(),
             writer,
         )
     }
+}
+
+<span class="kw">impl </span>Size <span class="kw">for </span>MlsContentAuthData {
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.signature.tls_serialized_len()
+            + <span class="kw">if let </span><span class="prelude-val">Some</span>(confirmation_tag) = <span class="kw-2">&amp;</span><span class="self">self</span>.confirmation_tag {
+                confirmation_tag.tls_serialized_len()
+            } <span class="kw">else </span>{
+                <span class="number">0
+            </span>}
+    }
+}
+
+<span class="kw">impl </span>Serialize <span class="kw">for </span>MlsContentAuthData {
+    <span class="kw">fn </span>tls_serialize&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, tls_codec::Error&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>written = <span class="self">self</span>.signature.tls_serialize(writer)<span class="question-mark">?</span>;
+        written += <span class="kw">if let </span><span class="prelude-val">Some</span>(confirmation_tag) = <span class="kw-2">&amp;</span><span class="self">self</span>.confirmation_tag {
+            confirmation_tag.tls_serialize(writer)<span class="question-mark">?
+        </span>} <span class="kw">else </span>{
+            <span class="number">0
+        </span>};
+        <span class="prelude-val">Ok</span>(written)
+    }
+}
+
+<span class="kw">fn </span>deserialize_content_auth_data&lt;R: Read&gt;(
+    bytes: <span class="kw-2">&amp;mut </span>R,
+    content_type: ContentType,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MlsContentAuthData, tls_codec::Error&gt; {
+    <span class="kw">let </span>signature = Signature::tls_deserialize(bytes)<span class="question-mark">?</span>;
+    <span class="kw">let </span>confirmation_tag = <span class="kw">if </span><span class="macro">matches!</span>(content_type, ContentType::Commit) {
+        <span class="prelude-val">Some</span>(ConfirmationTag::tls_deserialize(bytes)<span class="question-mark">?</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
+    <span class="prelude-val">Ok</span>(MlsContentAuthData {
+        signature,
+        confirmation_tag,
+    })
 }
 
 <span class="kw">impl </span>Deserialize <span class="kw">for </span>MlsCiphertext {
@@ -408,7 +423,7 @@
         <span class="kw">let </span>group_id = GroupId::tls_deserialize(bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>epoch = GroupEpoch::tls_deserialize(bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>content_type = ContentType::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>authenticated_data = TlsByteVecU32::tls_deserialize(bytes)<span class="question-mark">?</span>;
+        <span class="kw">let </span>authenticated_data = VLBytes::tls_deserialize(bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>encrypted_sender_data = TlsByteVecU8::tls_deserialize(bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>ciphertext = TlsByteVecU32::tls_deserialize(bytes)<span class="question-mark">?</span>;
 
@@ -457,7 +472,7 @@
                 <span class="kw">let </span>wire_format = WireFormat::tls_deserialize(<span class="kw-2">&amp;mut </span><span class="macro">vec!</span>[<span class="kw-2">*</span>first_byte].as_slice())<span class="question-mark">?</span>;
                 <span class="kw">let </span>body = <span class="kw">match </span>wire_format {
                     WireFormat::MlsPlaintext =&gt; {
-                        <span class="kw">let </span>plaintext = VerifiableMlsPlaintext::tls_deserialize(<span class="kw-2">&amp;mut </span>chain)<span class="question-mark">?</span>;
+                        <span class="kw">let </span>plaintext = VerifiableMlsAuthContent::tls_deserialize(<span class="kw-2">&amp;mut </span>chain)<span class="question-mark">?</span>;
                         MlsMessageBody::Plaintext(plaintext)
                     }
                     WireFormat::MlsCiphertext =&gt; {
@@ -479,7 +494,7 @@
     </span><span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.body {
             MlsMessageBody::Plaintext(plaintext) =&gt; {
-                VerifiableMlsPlaintext::tls_serialized_len(plaintext)
+                VerifiableMlsAuthContent::tls_serialized_len(plaintext)
             }
             MlsMessageBody::Ciphertext(ciphertext) =&gt; MlsCiphertext::tls_serialized_len(ciphertext),
         }
@@ -489,8 +504,7 @@
 <span class="kw">impl </span>Size <span class="kw">for </span>MlsCiphertextContent {
     <span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.content.tls_serialized_len() +
-           <span class="self">self</span>.signature.tls_serialized_len() +
-            <span class="self">self</span>.confirmation_tag.tls_serialized_len() +
+           <span class="self">self</span>.auth.tls_serialized_len() +
             <span class="comment">// Note: The padding is appended as a &quot;raw&quot; all-zero byte slice
             // with length `length_of_padding`. Thus, we only need to add
             // this length here.
@@ -502,9 +516,11 @@
     <span class="kw">fn </span>tls_serialize&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, Error&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>written = <span class="number">0</span>;
 
-        written += <span class="self">self</span>.content.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.signature.tls_serialize(writer)<span class="question-mark">?</span>;
-        written += <span class="self">self</span>.confirmation_tag.tls_serialize(writer)<span class="question-mark">?</span>;
+        <span class="comment">// The `content` field is serialized without the `content_type`, which
+        // is not part of the struct as per MLS spec.
+        </span>written += <span class="self">self</span>.content.serialize_without_type(writer)<span class="question-mark">?</span>;
+
+        written += <span class="self">self</span>.auth.tls_serialize(writer)<span class="question-mark">?</span>;
         <span class="kw">let </span>padding = <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="self">self</span>.length_of_padding];
         writer.write_all(<span class="kw-2">&amp;</span>padding)<span class="question-mark">?</span>;
         written += <span class="self">self</span>.length_of_padding;
@@ -513,40 +529,34 @@
     }
 }
 
-<span class="kw">impl </span>Deserialize <span class="kw">for </span>MlsCiphertextContent {
-    <span class="doccomment">/// We first decode `content`, `signature`, and `confirmation_tag`, and then make sure
-    /// that the rest of the slice contains only zero bytes, i.e., is the padding.
-    /// Note: This always &quot;terminates&quot; the `Read` instance because we call `read_to_end`.
-    </span><span class="kw">fn </span>tls_deserialize&lt;R: Read&gt;(bytes: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt;
-    <span class="kw">where
-        </span><span class="self">Self</span>: Sized,
-    {
-        <span class="kw">let </span>content = MlsContentBody::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>signature = Signature::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>confirmation_tag = <span class="prelude-ty">Option</span>::&lt;ConfirmationTag&gt;::tls_deserialize(bytes)<span class="question-mark">?</span>;
+<span class="doccomment">/// This function implements deserialization manually, as it requires `content_type` as additional input.
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>deserialize_ciphertext_content&lt;R: Read&gt;(
+    bytes: <span class="kw-2">&amp;mut </span>R,
+    content_type: ContentType,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MlsCiphertextContent, tls_codec::Error&gt; {
+    <span class="kw">let </span>content = MlsContentBody::deserialize_without_type(bytes, content_type)<span class="question-mark">?</span>;
+    <span class="kw">let </span>auth = deserialize_content_auth_data(bytes, content_type)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>padding = {
-            <span class="kw">let </span><span class="kw-2">mut </span>buffer = Vec::new();
-            bytes
-                .read_to_end(<span class="kw-2">&amp;mut </span>buffer)
-                .map_err(|<span class="kw">_</span>| Error::InvalidInput)<span class="question-mark">?</span>;
-            buffer
-        };
+    <span class="kw">let </span>padding = {
+        <span class="kw">let </span><span class="kw-2">mut </span>buffer = Vec::new();
+        bytes
+            .read_to_end(<span class="kw-2">&amp;mut </span>buffer)
+            .map_err(|<span class="kw">_</span>| Error::InvalidInput)<span class="question-mark">?</span>;
+        buffer
+    };
 
-        <span class="kw">let </span>length_of_padding = padding.len();
+    <span class="kw">let </span>length_of_padding = padding.len();
 
-        <span class="comment">// ValSem011: MLSCiphertextContent padding must be all-zero.
-        </span><span class="kw">if </span>!padding.into_iter().all(|byte| byte == <span class="number">0x00</span>) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::InvalidInput);
-        }
-
-        <span class="prelude-val">Ok</span>(MlsCiphertextContent {
-            content,
-            signature,
-            confirmation_tag,
-            length_of_padding,
-        })
+    <span class="comment">// ValSem011: MLSCiphertextContent padding must be all-zero.
+    </span><span class="kw">if </span>!padding.into_iter().all(|byte| byte == <span class="number">0x00</span>) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::InvalidInput);
     }
+
+    <span class="prelude-val">Ok</span>(MlsCiphertextContent {
+        content,
+        auth,
+        length_of_padding,
+    })
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="openmls" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

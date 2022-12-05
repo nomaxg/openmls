@@ -741,6 +741,76 @@
 <span id="741">741</span>
 <span id="742">742</span>
 <span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
 </pre><pre class="rust"><code><span class="doccomment">//! ### Don&#39;t Panic!
 //!
 //! Functions in this module should never panic. However, if there is a bug in
@@ -780,17 +850,18 @@
 </span><span class="kw">use </span><span class="kw">super</span>::errors::CreateGroupContextExtProposalError;
 
 <span class="kw">use crate</span>::{
-    ciphersuite::{hash_ref::KeyPackageRef, signable::<span class="kw-2">*</span>},
+    ciphersuite::{signable::Signable, HpkePublicKey},
     credentials::<span class="kw-2">*</span>,
     error::LibraryError,
     extensions::errors::<span class="kw-2">*</span>,
     framing::<span class="kw-2">*</span>,
     group::<span class="kw-2">*</span>,
-    key_packages::{errors::KeyPackageExtensionSupportError, <span class="kw-2">*</span>},
-    messages::{proposals::<span class="kw-2">*</span>, public_group_state::<span class="kw-2">*</span>, <span class="kw-2">*</span>},
+    key_packages::<span class="kw-2">*</span>,
+    messages::VerifiableGroupInfo,
+    messages::{proposals::<span class="kw-2">*</span>, <span class="kw-2">*</span>},
     schedule::{message_secrets::<span class="kw-2">*</span>, psk::<span class="kw-2">*</span>, <span class="kw-2">*</span>},
     tree::{secret_tree::SecretTreeError, sender_ratchet::SenderRatchetConfiguration},
-    treesync::{errors::TreeSyncError, <span class="kw-2">*</span>},
+    treesync::{node::leaf_node::Capabilities, <span class="kw-2">*</span>},
     versions::ProtocolVersion,
 };
 
@@ -805,7 +876,10 @@
 <span class="kw">use </span>tls_codec::Serialize <span class="kw">as </span>TlsSerializeTrait;
 
 <span class="kw">use super</span>::{
-    errors::{CoreGroupBuildError, CreateAddProposalError, ExporterError, ProposalValidationError},
+    errors::{
+        CoreGroupBuildError, CreateAddProposalError, ExporterError, ProposalValidationError,
+        ValidationError,
+    },
     group_context::<span class="kw-2">*</span>,
 };
 
@@ -814,6 +888,36 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) commit: MlsPlaintext,
     <span class="kw">pub</span>(<span class="kw">crate</span>) welcome_option: <span class="prelude-ty">Option</span>&lt;Welcome&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) staged_commit: StagedCommit,
+}
+
+<span class="doccomment">/// A member in the group is identified by this [`Member`] struct.
+</span><span class="attribute">#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+</span><span class="kw">pub struct </span>Member {
+    <span class="doccomment">/// The member&#39;s leaf index in the ratchet tree.
+    </span><span class="kw">pub </span>index: u32,
+    <span class="doccomment">/// The member&#39;s identity from the credential.
+    </span><span class="kw">pub </span>identity: Vec&lt;u8&gt;,
+    <span class="doccomment">/// The member&#39;s public HPHKE encryption key.
+    </span><span class="kw">pub </span>encryption_key: Vec&lt;u8&gt;,
+    <span class="doccomment">/// The member&#39;s public signature key.
+    </span><span class="kw">pub </span>signature_key: Vec&lt;u8&gt;,
+}
+
+<span class="kw">impl </span>Member {
+    <span class="doccomment">/// Create new member.
+    </span><span class="kw">pub fn </span>new(
+        index: u32,
+        encryption_key: Vec&lt;u8&gt;,
+        signature_key: Vec&lt;u8&gt;,
+        identity: Vec&lt;u8&gt;,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            index,
+            encryption_key,
+            signature_key,
+            identity,
+        }
+    }
 }
 
 <span class="attribute">#[derive(Debug, Serialize, Deserialize)]
@@ -842,12 +946,14 @@
 <span class="doccomment">/// Builder for [`CoreGroup`].
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>CoreGroupBuilder {
     key_package_bundle: KeyPackageBundle,
+    own_leaf_extensions: Vec&lt;Extension&gt;,
     group_id: GroupId,
     config: <span class="prelude-ty">Option</span>&lt;CoreGroupConfig&gt;,
     psk_ids: Vec&lt;PreSharedKeyId&gt;,
     version: <span class="prelude-ty">Option</span>&lt;ProtocolVersion&gt;,
     required_capabilities: <span class="prelude-ty">Option</span>&lt;RequiredCapabilitiesExtension&gt;,
     max_past_epochs: usize,
+    lifetime: <span class="prelude-ty">Option</span>&lt;LifetimeExtension&gt;,
 }
 
 <span class="kw">impl </span>CoreGroupBuilder {
@@ -861,6 +967,8 @@
             version: <span class="prelude-val">None</span>,
             required_capabilities: <span class="prelude-val">None</span>,
             max_past_epochs: <span class="number">0</span>,
+            own_leaf_extensions: <span class="macro">vec!</span>[],
+            lifetime: <span class="prelude-val">None</span>,
         }
     }
     <span class="doccomment">/// Set the [`CoreGroupConfig`] of the [`CoreGroup`].
@@ -887,6 +995,17 @@
         <span class="self">self</span>.max_past_epochs = max_past_epochs;
         <span class="self">self
     </span>}
+    <span class="doccomment">/// Set the [`LifetimeExtension`] for the own leaf in the group.
+    </span><span class="kw">pub fn </span>with_lifetime(<span class="kw-2">mut </span><span class="self">self</span>, lifetime: LifetimeExtension) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.lifetime = <span class="prelude-val">Some</span>(lifetime);
+        <span class="self">self
+    </span>}
+    <span class="doccomment">/// Set extensions for the own leaf in the group.
+    </span><span class="attribute">#[cfg(test)]
+    </span><span class="kw">pub fn </span>with_extensions(<span class="kw-2">mut </span><span class="self">self</span>, extensions: Vec&lt;Extension&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.own_leaf_extensions = extensions;
+        <span class="self">self
+    </span>}
 
     <span class="doccomment">/// Build the [`CoreGroup`].
     /// Any values that haven&#39;t been set in the builder are set to their default
@@ -896,17 +1015,35 @@
     /// [`OpenMlsCryptoProvider`].
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>build(
         <span class="self">self</span>,
+        credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;CoreGroup, CoreGroupBuildError&gt; {
         <span class="kw">let </span>ciphersuite = <span class="self">self</span>.key_package_bundle.key_package().ciphersuite();
         <span class="kw">let </span>config = <span class="self">self</span>.config.unwrap_or_default();
-        <span class="kw">let </span>required_capabilities = <span class="self">self</span>.required_capabilities.unwrap_or_default();
+        <span class="kw">let </span>capabilities = <span class="self">self
+            </span>.required_capabilities
+            .as_ref()
+            .map(|re| re.extensions());
         <span class="kw">let </span>version = <span class="self">self</span>.version.unwrap_or_default();
 
         <span class="macro">debug!</span>(<span class="string">&quot;Created group {:x?}&quot;</span>, <span class="self">self</span>.group_id);
         <span class="macro">trace!</span>(<span class="string">&quot; &gt;&gt;&gt; with {:?}, {:?}&quot;</span>, ciphersuite, config);
-        <span class="kw">let </span>(tree, commit_secret) = TreeSync::new(backend, <span class="self">self</span>.key_package_bundle)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(tree, commit_secret) = TreeSync::new(
+            backend,
+            <span class="self">self</span>.key_package_bundle,
+            credential_bundle,
+            <span class="self">self</span>.lifetime.unwrap_or_default(),
+            Capabilities::new(
+                <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>[version]),     <span class="comment">// TODO: Allow more versions
+                </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>[ciphersuite]), <span class="comment">// TODO: allow more ciphersuites
+                </span>capabilities,
+                <span class="prelude-val">None</span>,
+                <span class="prelude-val">None</span>,
+            ),
+            <span class="self">self</span>.own_leaf_extensions,
+        )<span class="question-mark">?</span>;
 
+        <span class="kw">let </span>required_capabilities = <span class="self">self</span>.required_capabilities.unwrap_or_default();
         required_capabilities.check_support().map_err(|e| <span class="kw">match </span>e {
             ExtensionError::UnsupportedProposalType =&gt; CoreGroupBuildError::UnsupportedProposalType,
             ExtensionError::UnsupportedExtensionType =&gt; {
@@ -994,20 +1131,16 @@
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;MlsPlaintext, CreateAddProposalError&gt; {
         joiner_key_package
+            .leaf_node()
             .validate_required_capabilities(<span class="self">self</span>.required_capabilities())
-            .map_err(|e| <span class="kw">match </span>e {
-                KeyPackageExtensionSupportError::UnsupportedExtension =&gt; {
-                    CreateAddProposalError::UnsupportedExtensions
-                }
-            })<span class="question-mark">?</span>;
+            .map_err(|<span class="kw">_</span>| CreateAddProposalError::UnsupportedExtensions)<span class="question-mark">?</span>;
         <span class="kw">let </span>add_proposal = AddProposal {
             key_package: joiner_key_package,
         };
         <span class="kw">let </span>proposal = Proposal::Add(add_proposal);
         MlsPlaintext::member_proposal(
             framing_parameters,
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             proposal,
             credential_bundle,
             <span class="self">self</span>.context(),
@@ -1025,15 +1158,16 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         framing_parameters: FramingParameters,
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
-        key_package: KeyPackage,
+        <span class="comment">// XXX: There&#39;s no need to own this. The [`UpdateProposal`] should
+        //      operate on a reference to make this more efficient.
+        </span>leaf_node: LeafNode,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;MlsPlaintext, LibraryError&gt; {
-        <span class="kw">let </span>update_proposal = UpdateProposal { key_package };
+        <span class="kw">let </span>update_proposal = UpdateProposal { leaf_node };
         <span class="kw">let </span>proposal = Proposal::Update(update_proposal);
         MlsPlaintext::member_proposal(
             framing_parameters,
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             proposal,
             credential_bundle,
             <span class="self">self</span>.context(),
@@ -1050,23 +1184,24 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         framing_parameters: FramingParameters,
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
-        removed: <span class="kw-2">&amp;</span>KeyPackageRef,
+        removed: u32,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;MlsPlaintext, LibraryError&gt; {
-        <span class="kw">let </span>remove_proposal = RemoveProposal {
-            removed: removed.clone(),
-        };
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;MlsPlaintext, ValidationError&gt; {
+        <span class="kw">if </span><span class="self">self</span>.treesync().leaf_is_in_tree(removed).is_err() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(ValidationError::UnknownMember);
+        }
+        <span class="kw">let </span>remove_proposal = RemoveProposal { removed };
         <span class="kw">let </span>proposal = Proposal::Remove(remove_proposal);
         MlsPlaintext::member_proposal(
             framing_parameters,
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             proposal,
             credential_bundle,
             <span class="self">self</span>.context(),
             <span class="self">self</span>.message_secrets().membership_key(),
             backend,
         )
+        .map_err(ValidationError::LibraryError)
     }
 
     <span class="comment">// 11.1.4. PreSharedKey
@@ -1086,8 +1221,7 @@
         <span class="kw">let </span>proposal = Proposal::PreSharedKey(presharedkey_proposal);
         MlsPlaintext::member_proposal(
             framing_parameters,
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             proposal,
             credential_bundle,
             <span class="self">self</span>.context(),
@@ -1117,20 +1251,17 @@
             <span class="self">self</span>.treesync()
                 .own_leaf_node()
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected own leaf&quot;</span>))<span class="question-mark">?
-                </span>.key_package()
-                .validate_required_capabilities(required_capabilities)<span class="question-mark">?</span>;
-            <span class="comment">// Ensure that all other key packages support all the required
+                </span>.validate_required_capabilities(required_capabilities)<span class="question-mark">?</span>;
+            <span class="comment">// Ensure that all other leaf nodes support all the required
             // extensions as well.
-            </span><span class="kw">for </span>(_index, key_package) <span class="kw">in </span><span class="self">self</span>.treesync().full_leaves()<span class="question-mark">? </span>{
-                key_package.check_extension_support(required_capabilities.extensions())<span class="question-mark">?</span>;
-            }
+            </span><span class="self">self</span>.treesync()
+                .check_extension_support(required_capabilities.extensions())<span class="question-mark">?</span>;
         }
         <span class="kw">let </span>proposal = GroupContextExtensionProposal::new(extensions);
         <span class="kw">let </span>proposal = Proposal::GroupContextExtensions(proposal);
         MlsPlaintext::member_proposal(
             framing_parameters,
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             proposal,
             credential_bundle,
             <span class="self">self</span>.context(),
@@ -1150,8 +1281,7 @@
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;MlsCiphertext, MessageEncryptionError&gt; {
         <span class="kw">let </span>mls_plaintext = MlsPlaintext::new_application(
-            <span class="self">self</span>.key_package_ref()
-                .ok_or_else(|| LibraryError::custom(<span class="string">&quot;missing key package&quot;</span>))<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
             aad,
             msg,
             credential_bundle,
@@ -1191,16 +1321,24 @@
         mls_ciphertext: <span class="kw-2">&amp;</span>MlsCiphertext,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         sender_ratchet_configuration: <span class="kw-2">&amp;</span>SenderRatchetConfiguration,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;VerifiableMlsPlaintext, MessageDecryptionError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;VerifiableMlsAuthContent, MessageDecryptionError&gt; {
+        <span class="kw">use </span><span class="kw">crate</span>::tree::index::SecretTreeLeafIndex;
+
         <span class="kw">let </span>ciphersuite = <span class="self">self</span>.ciphersuite();
         <span class="kw">let </span>message_secrets = <span class="self">self
             </span>.message_secrets_mut(mls_ciphertext.epoch())
             .map_err(|<span class="kw">_</span>| MessageDecryptionError::AeadError)<span class="question-mark">?</span>;
         <span class="kw">let </span>sender_data = mls_ciphertext.sender_data(message_secrets, backend, ciphersuite)<span class="question-mark">?</span>;
-        <span class="kw">let </span>sender_index = <span class="self">self
-            </span>.sender_index(<span class="kw-2">&amp;</span>sender_data.sender)
-            .map_err(|<span class="kw">_</span>| MessageDecryptionError::SenderError(SenderError::UnknownSender))<span class="question-mark">?</span>;
-        <span class="kw">let </span>sender_index = <span class="kw">crate</span>::tree::index::SecretTreeLeafIndex(sender_index);
+        <span class="kw">if </span><span class="self">self
+            </span>.treesync()
+            .leaf_is_in_tree(sender_data.leaf_index)
+            .is_err()
+        {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(MessageDecryptionError::SenderError(
+                SenderError::UnknownSender,
+            ));
+        }
+        <span class="kw">let </span>sender_index = SecretTreeLeafIndex(sender_data.leaf_index);
         <span class="kw">let </span>message_secrets = <span class="self">self
             </span>.message_secrets_mut(mls_ciphertext.epoch())
             .map_err(|<span class="kw">_</span>| MessageDecryptionError::AeadError)<span class="question-mark">?</span>;
@@ -1233,13 +1371,55 @@
             .map_err(LibraryError::unexpected_crypto_error)<span class="question-mark">?</span>)
     }
 
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>export_group_info(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
+        credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
+        with_ratchet_tree: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;GroupInfo, LibraryError&gt; {
+        <span class="kw">let </span>extensions = {
+            <span class="kw">let </span>ratchet_tree_extension = || {
+                Extension::RatchetTree(RatchetTreeExtension::new(<span class="self">self</span>.treesync().export_nodes()))
+            };
+
+            <span class="kw">let </span>external_pub_extension = || {
+                <span class="kw">let </span>external_pub = <span class="self">self
+                    </span>.group_epoch_secrets()
+                    .external_secret()
+                    .derive_external_keypair(backend.crypto(), <span class="self">self</span>.ciphersuite)
+                    .public;
+                Extension::ExternalPub(ExternalPubExtension::new(HpkePublicKey::from(external_pub)))
+            };
+
+            <span class="kw">if </span>with_ratchet_tree {
+                <span class="macro">vec!</span>[ratchet_tree_extension(), external_pub_extension()]
+            } <span class="kw">else </span>{
+                <span class="macro">vec!</span>[external_pub_extension()]
+            }
+        };
+
+        <span class="comment">// Create to-be-signed group info.
+        </span><span class="kw">let </span>group_info_tbs = GroupInfoTBS::new(
+            <span class="self">self</span>.group_context.clone(),
+            <span class="kw-2">&amp;</span>extensions,
+            <span class="self">self</span>.message_secrets()
+                .confirmation_key()
+                .tag(backend, <span class="self">self</span>.context().confirmed_transcript_hash())
+                .map_err(LibraryError::unexpected_crypto_error)<span class="question-mark">?</span>,
+            <span class="self">self</span>.own_leaf_index(),
+        );
+
+        <span class="comment">// Sign to-be-signed group info.
+        </span>group_info_tbs.sign(backend, credential_bundle)
+    }
+
     <span class="doccomment">/// Returns the epoch authenticator
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>epoch_authenticator(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>EpochAuthenticator {
         <span class="self">self</span>.group_epoch_secrets().epoch_authenticator()
     }
 
-    <span class="doccomment">/// Returns the resumption psk
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>resumption_psk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ResumptionPsk {
+    <span class="doccomment">/// Returns the resumption PSK secret
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>resumption_psk_secret(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ResumptionPskSecret {
         <span class="self">self</span>.group_epoch_secrets().resumption_psk()
     }
 
@@ -1256,7 +1436,7 @@
         writer.write_all(<span class="kw-2">&amp;</span>serialized_core_group.into_bytes())
     }
 
-    <span class="doccomment">/// Returns the ratchet tree
+    <span class="doccomment">/// Returns a reference to the ratchet tree
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>treesync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TreeSync {
         <span class="kw-2">&amp;</span><span class="self">self</span>.tree
     }
@@ -1281,15 +1461,6 @@
         <span class="self">self</span>.group_context.group_id()
     }
 
-    <span class="doccomment">/// Get the groups extensions.
-    /// Right now this is limited to the ratchet tree extension which is built
-    /// on the fly when calling this function.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>other_extensions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Extension&gt; {
-        <span class="macro">vec!</span>[Extension::RatchetTree(RatchetTreeExtension::new(
-            <span class="self">self</span>.treesync().export_nodes(),
-        ))]
-    }
-
     <span class="doccomment">/// Get the group context extensions.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>group_context_extensions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[Extension] {
         <span class="self">self</span>.group_context.extensions()
@@ -1298,17 +1469,6 @@
     <span class="doccomment">/// Get the required capabilities extension of this group.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>required_capabilities(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>RequiredCapabilitiesExtension&gt; {
         <span class="self">self</span>.group_context.required_capabilities()
-    }
-
-    <span class="doccomment">/// Export the `PublicGroupState`
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>export_public_group_state(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
-        credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;PublicGroupState, LibraryError&gt; {
-        <span class="kw">let </span>pgs_tbs = PublicGroupStateTbs::new(backend, <span class="self">self</span>)<span class="question-mark">?</span>;
-        <span class="comment">// XXX: #719 removes the PublicGroupState
-        </span>pgs_tbs.sign(backend, credential_bundle)
     }
 
     <span class="doccomment">/// Returns `true` if the group uses the ratchet tree extension anf `false
@@ -1321,25 +1481,17 @@
 
 <span class="comment">// Private and crate functions
 </span><span class="kw">impl </span>CoreGroup {
-    <span class="doccomment">/// Get the leaf index in the tree for a given [`KeyPackageRef`].
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>sender_index(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        key_package_ref: <span class="kw-2">&amp;</span>KeyPackageRef,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;u32, TreeSyncError&gt; {
-        <span class="self">self</span>.treesync().leaf_index(key_package_ref)
-    }
-
     <span class="doccomment">/// Get the leaf index of this client.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>own_leaf_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="self">self</span>.treesync().own_leaf_index()
     }
 
-    <span class="doccomment">/// Get the [`KeyPackageRef`] of the client owning this group.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>key_package_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>KeyPackageRef&gt; {
+    <span class="doccomment">/// Get the identity of the client&#39;s [`Credential`] owning this group.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>own_identity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[u8]&gt; {
         <span class="self">self</span>.treesync()
             .own_leaf_node()
             .ok()
-            .and_then(|node| node.key_package_ref())
+            .map(|node| node.credential().identity())
     }
 
     <span class="doccomment">/// Get a reference to the group epoch secrets from the group
@@ -1395,7 +1547,7 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>message_secrets_and_leaves_mut&lt;<span class="lifetime">&#39;secret</span>, <span class="lifetime">&#39;group</span>: <span class="lifetime">&#39;secret</span>&gt;(
         <span class="kw-2">&amp;</span><span class="lifetime">&#39;group </span><span class="kw-2">mut </span><span class="self">self</span>,
         epoch: GroupEpoch,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;secret </span><span class="kw-2">mut </span>MessageSecrets, IndexedKeyPackageRefs), MessageDecryptionError&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;secret </span><span class="kw-2">mut </span>MessageSecrets, <span class="kw-2">&amp;</span>[Member]), MessageDecryptionError&gt; {
         <span class="kw">if </span>epoch &lt; <span class="self">self</span>.context().epoch() {
             <span class="self">self</span>.message_secrets_store
                 .secrets_and_leaves_for_epoch_mut(epoch)
@@ -1405,23 +1557,13 @@
         } <span class="kw">else </span>{
             <span class="comment">// No need for leaves here. The tree of the current epoch is
             // available to the caller.
-            </span><span class="prelude-val">Ok</span>((<span class="self">self</span>.message_secrets_store.message_secrets_mut(), Vec::new()))
+            </span><span class="prelude-val">Ok</span>((<span class="self">self</span>.message_secrets_store.message_secrets_mut(), <span class="kw-2">&amp;</span>[]))
         }
     }
 
     <span class="attribute">#[cfg(any(feature = <span class="string">&quot;test-utils&quot;</span>, test))]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>message_secrets_test_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>MessageSecrets {
         <span class="self">self</span>.message_secrets_store.message_secrets_mut()
-    }
-
-    <span class="doccomment">/// Current interim transcript hash of the group
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>interim_transcript_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.interim_transcript_hash
-    }
-
-    <span class="doccomment">/// Current confirmed transcript hash of the group
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>confirmed_transcript_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
-        <span class="self">self</span>.group_context.confirmed_transcript_hash()
     }
 
     <span class="attribute">#[cfg(any(feature = <span class="string">&quot;test-utils&quot;</span>, test))]
@@ -1442,7 +1584,7 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>update_confirmed_transcript_hash(
     ciphersuite: Ciphersuite,
     backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
-    mls_plaintext_commit_content: <span class="kw-2">&amp;</span>MlsPlaintextCommitContent,
+    mls_plaintext_commit_content: <span class="kw-2">&amp;</span>ConfirmedTranscriptHashInput,
     interim_transcript_hash: <span class="kw-2">&amp;</span>[u8],
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, LibraryError&gt; {
     <span class="kw">let </span>commit_content_bytes = mls_plaintext_commit_content
@@ -1460,7 +1602,7 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>update_interim_transcript_hash(
     ciphersuite: Ciphersuite,
     backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
-    mls_plaintext_commit_auth_data: <span class="kw-2">&amp;</span>MlsPlaintextCommitAuthData,
+    mls_plaintext_commit_auth_data: <span class="kw-2">&amp;</span>InterimTranscriptHashInput,
     confirmed_transcript_hash: <span class="kw-2">&amp;</span>[u8],
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, LibraryError&gt; {
     <span class="kw">let </span>commit_auth_data_bytes = mls_plaintext_commit_auth_data
@@ -1482,7 +1624,5 @@
     /// Defaults to false.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) add_ratchet_tree_extension: bool,
 }
-
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>IndexedKeyPackageRefs = Vec&lt;(u32, KeyPackageRef)&gt;;
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="openmls" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

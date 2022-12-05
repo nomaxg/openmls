@@ -452,6 +452,18 @@
 <span id="452">452</span>
 <span id="453">453</span>
 <span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
 </pre><pre class="rust"><code><span class="doccomment">//! # MLS group errors
 //!
 //! This module contains errors that originate at lower levels and are partially re-exported in errors thrown by functions of the `MlsGroup` API.
@@ -544,6 +556,9 @@
     <span class="doccomment">/// No ratchet tree available to build initial tree.
     </span><span class="attribute">#[error(<span class="string">&quot;No ratchet tree available to build initial tree.&quot;</span>)]
     </span>MissingRatchetTree,
+    <span class="doccomment">/// No external_pub extension available to join group by external commit.
+    </span><span class="attribute">#[error(<span class="string">&quot;No external_pub extension available to join group by external commit.&quot;</span>)]
+    </span>MissingExternalPub,
     <span class="doccomment">/// The computed tree hash does not match the one in the GroupInfo.
     </span><span class="attribute">#[error(<span class="string">&quot;The computed tree hash does not match the one in the GroupInfo.&quot;</span>)]
     </span>TreeHashMismatch,
@@ -556,9 +571,9 @@
     <span class="doccomment">/// Sender not found in tree.
     </span><span class="attribute">#[error(<span class="string">&quot;Sender not found in tree.&quot;</span>)]
     </span>UnknownSender,
-    <span class="doccomment">/// The signature over the given public group state is invalid.
-    </span><span class="attribute">#[error(<span class="string">&quot;The signature over the given public group state is invalid.&quot;</span>)]
-    </span>InvalidPublicGroupStateSignature,
+    <span class="doccomment">/// The signature over the given group info is invalid.
+    </span><span class="attribute">#[error(<span class="string">&quot;The signature over the given group info is invalid.&quot;</span>)]
+    </span>InvalidGroupInfoSignature,
     <span class="doccomment">/// A duplicate ratchet tree was found.
     </span><span class="attribute">#[error(<span class="string">&quot;A duplicate ratchet tree was found.&quot;</span>)]
     </span>DuplicateRatchetTreeExtension,
@@ -585,9 +600,9 @@
     <span class="doccomment">/// stage_commit was called with an MlsPlaintext that is not a Commit.
     </span><span class="attribute">#[error(<span class="string">&quot;stage_commit was called with an MlsPlaintext that is not a Commit.&quot;</span>)]
     </span>WrongPlaintextContentType,
-    <span class="doccomment">/// Unable to verify the key package signature.
-    </span><span class="attribute">#[error(<span class="string">&quot;Unable to verify the key package signature.&quot;</span>)]
-    </span>PathKeyPackageVerificationFailure,
+    <span class="doccomment">/// Unable to verify the leaf node signature.
+    </span><span class="attribute">#[error(<span class="string">&quot;Unable to verify the leaf node signature.&quot;</span>)]
+    </span>PathLeafNodeVerificationFailure,
     <span class="doccomment">/// Unable to determine commit path.
     </span><span class="attribute">#[error(<span class="string">&quot;Unable to determine commit path.&quot;</span>)]
     </span>RequiredPathNotFound,
@@ -612,6 +627,9 @@
     <span class="doccomment">/// The sender is of type external, which is not valid.
     </span><span class="attribute">#[error(<span class="string">&quot;The sender is of type external, which is not valid.&quot;</span>)]
     </span>SenderTypeExternal,
+    <span class="doccomment">/// The sender is of type `NewMemberProposal`, which is not valid.
+    </span><span class="attribute">#[error(<span class="string">&quot;The sender is of type NewMemberProposal, which is not valid.&quot;</span>)]
+    </span>SenderTypeNewMemberProposal,
     <span class="doccomment">/// Too many new members: the tree is full.
     </span><span class="attribute">#[error(<span class="string">&quot;Too many new members: the tree is full.&quot;</span>)]
     </span>TooManyNewMembers,
@@ -667,11 +685,14 @@
     <span class="doccomment">/// Message epoch differs from the group&#39;s epoch.
     </span><span class="attribute">#[error(<span class="string">&quot;Message epoch differs from the group&#39;s epoch.&quot;</span>)]
     </span>WrongEpoch,
-    <span class="doccomment">/// The MlsPlaintext is not a Commit despite the sender begin of type NewMember.
-    </span><span class="attribute">#[error(<span class="string">&quot;The MlsPlaintext is not a Commit despite the sender begin of type NewMember.&quot;</span>)]
+    <span class="doccomment">/// The MlsPlaintext is not a Commit despite the sender begin of type [NewMemberCommit](crate::prelude::Sender::NewMemberCommit).
+    </span><span class="attribute">#[error(<span class="string">&quot;The MlsPlaintext is not a Commit despite the sender begin of type NewMemberCommit.&quot;</span>)]
     </span>NotACommit,
-    <span class="doccomment">/// The Commit doesn&#39;t have a path despite the sender being of type NewMember.
-    </span><span class="attribute">#[error(<span class="string">&quot;The Commit doesn&#39;t have a path despite the sender being of type NewMember.&quot;</span>)]
+    <span class="doccomment">/// The MlsPlaintext is not an External Add Proposal despite the sender begin of type [NewMemberProposal](crate::prelude::Sender::NewMemberProposal).
+    </span><span class="attribute">#[error(<span class="string">&quot;The MlsPlaintext is not an external Add proposal despite the sender begin of type NewMemberProposal.&quot;</span>)]
+    </span>NotAnExternalAddProposal,
+    <span class="doccomment">/// The Commit doesn&#39;t have a path despite the sender being of type NewMemberCommit.
+    </span><span class="attribute">#[error(<span class="string">&quot;The Commit doesn&#39;t have a path despite the sender being of type NewMemberCommit.&quot;</span>)]
     </span>NoPath,
     <span class="doccomment">/// The MlsPlaintext contains an application message but was not encrypted.
     </span><span class="attribute">#[error(<span class="string">&quot;The MlsPlaintext contains an application message but was not encrypted.&quot;</span>)]
@@ -777,9 +798,6 @@
     <span class="doccomment">/// Remove proposal targets the wrong group member.
     </span><span class="attribute">#[error(<span class="string">&quot;Remove proposal targets the wrong group member.&quot;</span>)]
     </span>InvalidRemoveProposal,
-    <span class="doccomment">/// Found an ExternalInit proposal among the referenced proposals.
-    </span><span class="attribute">#[error(<span class="string">&quot;Found an ExternalInit proposal among the referenced proposals.&quot;</span>)]
-    </span>ReferencedExternalInitProposal,
     <span class="comment">// TODO #803: this seems unused
     </span><span class="doccomment">/// External Commit has to contain a path.
     </span><span class="attribute">#[error(<span class="string">&quot;External Commit has to contain a path.&quot;</span>)]
@@ -787,6 +805,9 @@
     <span class="doccomment">/// The remove proposal referenced a non-existing member.
     </span><span class="attribute">#[error(<span class="string">&quot;The remove proposal referenced a non-existing member.&quot;</span>)]
     </span>UnknownMemberRemoval,
+    <span class="doccomment">/// External commit contains referenced proposal
+    </span><span class="attribute">#[error(<span class="string">&quot;Found a referenced proposal in an External Commit.&quot;</span>)]
+    </span>ReferencedProposal,
 }
 
 <span class="comment">// === Crate errors ===
@@ -858,9 +879,9 @@
     <span class="doccomment">/// See [`LibraryError`] for more details.
     </span><span class="attribute">#[error(transparent)]
     </span>LibraryError(<span class="attribute">#[from] </span>LibraryError),
-    <span class="doccomment">/// Own KeyPackageBundle was not found in the key store.
-    </span><span class="attribute">#[error(<span class="string">&quot;Own KeyPackageBundle was not found in the key store.&quot;</span>)]
-    </span>MissingKeyPackageBundle,
+    <span class="doccomment">/// Own LeafNode was not found in the key store.
+    </span><span class="attribute">#[error(<span class="string">&quot;Own LeafNode was not found in the key store.&quot;</span>)]
+    </span>MissingLeafNode,
 }
 
 <span class="comment">// Core group build error
@@ -902,6 +923,9 @@
     <span class="doccomment">/// See [`KeyPackageExtensionSupportError`] for more details.
     </span><span class="attribute">#[error(transparent)]
     </span>KeyPackageExtensionSupport(<span class="attribute">#[from] </span>KeyPackageExtensionSupportError),
+    <span class="doccomment">/// See [`TreeSyncError`] for more details.
+    </span><span class="attribute">#[error(transparent)]
+    </span>TreeSyncError(<span class="attribute">#[from] </span>TreeSyncError),
     <span class="doccomment">/// See [`ExtensionError`] for more details.
     </span><span class="attribute">#[error(transparent)]
     </span>Extension(<span class="attribute">#[from] </span>ExtensionError),

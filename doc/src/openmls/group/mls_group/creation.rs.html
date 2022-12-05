@@ -175,25 +175,80 @@
 <span id="175">175</span>
 <span id="176">176</span>
 <span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     group::{
         core_group::create_commit_params::CreateCommitParams,
         errors::{CoreGroupBuildError, ExternalCommitError, WelcomeError},
     },
-    messages::public_group_state::VerifiablePublicGroupState,
+    messages::VerifiableGroupInfo,
 };
+<span class="kw">use </span>tls_codec::Serialize;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">impl </span>MlsGroup {
     <span class="comment">// === Group creation ===
 
-    </span><span class="doccomment">/// Creates a new group from scratch with only the creator as a member. This
-    /// function removes the `KeyPackageBundle` corresponding to the
+    </span><span class="doccomment">/// Creates a new group with the creator as the only member (and a random group ID).
+    ///
+    /// This function removes the `KeyPackageBundle` corresponding to the
     /// `key_package_hash` from the key store. Returns an error
     /// ([`NewGroupError::NoMatchingKeyPackageBundle`]) if no
     /// [`KeyPackageBundle`] can be found.
     </span><span class="kw">pub fn </span>new(
+        backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
+        mls_group_config: <span class="kw-2">&amp;</span>MlsGroupConfig,
+        key_package_hash: <span class="kw-2">&amp;</span>[u8],
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, NewGroupError&gt; {
+        <span class="self">Self</span>::new_with_group_id(
+            backend,
+            mls_group_config,
+            GroupId::random(backend),
+            key_package_hash,
+        )
+    }
+
+    <span class="doccomment">/// Creates a new group with a given group ID with the creator as the only member.
+    ///
+    /// This function removes the `KeyPackageBundle` corresponding to the
+    /// `key_package_hash` from the key store. Returns an error
+    /// ([`NewGroupError::NoMatchingKeyPackageBundle`]) if no
+    /// [`KeyPackageBundle`] can be found.
+    </span><span class="kw">pub fn </span>new_with_group_id(
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         mls_group_config: <span class="kw-2">&amp;</span>MlsGroupConfig,
         group_id: GroupId,
@@ -209,6 +264,19 @@
             .key_store()
             .delete(<span class="kw-2">&amp;</span>kph)
             .map_err(|<span class="kw">_</span>| NewGroupError::KeyStoreDeletionError)<span class="question-mark">?</span>;
+        <span class="kw">let </span>credential_bundle: CredentialBundle = backend
+            .key_store()
+            .read(
+                <span class="kw-2">&amp;</span>key_package_bundle
+                    .key_package()
+                    .credential()
+                    .signature_key()
+                    .tls_serialize_detached()
+                    .map_err(|<span class="kw">_</span>| {
+                        LibraryError::custom(<span class="string">&quot;Unable to serialize signature public key&quot;</span>)
+                    })<span class="question-mark">?</span>,
+            )
+            .ok_or(NewGroupError::NoMatchingCredentialBundle)<span class="question-mark">?</span>;
         <span class="kw">let </span>group_config = CoreGroupConfig {
             add_ratchet_tree_extension: mls_group_config.use_ratchet_tree_extension,
         };
@@ -216,7 +284,8 @@
             .with_config(group_config)
             .with_required_capabilities(mls_group_config.required_capabilities.clone())
             .with_max_past_epoch_secrets(mls_group_config.max_past_epochs)
-            .build(backend)
+            .with_lifetime(mls_group_config.lifetime().clone())
+            .build(<span class="kw-2">&amp;</span>credential_bundle, backend)
             .map_err(|e| <span class="kw">match </span>e {
                 CoreGroupBuildError::LibraryError(e) =&gt; e.into(),
                 CoreGroupBuildError::UnsupportedProposalType =&gt; {
@@ -239,7 +308,7 @@
             mls_group_config: mls_group_config.clone(),
             group,
             proposal_store: ProposalStore::new(),
-            own_kpbs: <span class="macro">vec!</span>[],
+            own_leaf_nodes: <span class="macro">vec!</span>[],
             aad: <span class="macro">vec!</span>[],
             resumption_psk_store,
             group_state: MlsGroupState::Operational,
@@ -286,7 +355,7 @@
             mls_group_config: mls_group_config.clone(),
             group,
             proposal_store: ProposalStore::new(),
-            own_kpbs: <span class="macro">vec!</span>[],
+            own_leaf_nodes: <span class="macro">vec!</span>[],
             aad: <span class="macro">vec!</span>[],
             resumption_psk_store,
             group_state: MlsGroupState::Operational,
@@ -305,12 +374,12 @@
     /// the external commit was rejected due to an epoch change, the
     /// [`MlsGroup`] instance has to be discarded and a new one has to be
     /// created using this function based on the latest `ratchet_tree` and
-    /// public group state. For more information on the external init process,
+    /// group info. For more information on the external init process,
     /// please see Section 11.2.1 in the MLS specification.
     </span><span class="kw">pub fn </span>join_by_external_commit(
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         tree_option: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span>&lt;Node&gt;]&gt;,
-        verifiable_public_group_state: VerifiablePublicGroupState,
+        verifiable_group_info: VerifiableGroupInfo,
         mls_group_config: <span class="kw-2">&amp;</span>MlsGroupConfig,
         aad: <span class="kw-2">&amp;</span>[u8],
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
@@ -319,8 +388,7 @@
             ResumptionPskStore::new(mls_group_config.number_of_resumption_psks);
 
         <span class="comment">// Prepare the commit parameters
-        </span><span class="kw">let </span>framing_parameters =
-            FramingParameters::new(aad, mls_group_config.wire_format_policy().outgoing());
+        </span><span class="kw">let </span>framing_parameters = FramingParameters::new(aad, WireFormat::MlsPlaintext);
 
         <span class="kw">let </span>proposal_store = ProposalStore::new();
         <span class="kw">let </span>params = CreateCommitParams::builder()
@@ -332,7 +400,7 @@
             backend,
             params,
             tree_option,
-            verifiable_public_group_state,
+            verifiable_group_info,
         )<span class="question-mark">?</span>;
         group.set_max_past_epochs(mls_group_config.max_past_epochs);
 
@@ -340,7 +408,7 @@
             mls_group_config: mls_group_config.clone(),
             group,
             proposal_store: ProposalStore::new(),
-            own_kpbs: <span class="macro">vec!</span>[],
+            own_leaf_nodes: <span class="macro">vec!</span>[],
             aad: <span class="macro">vec!</span>[],
             resumption_psk_store,
             group_state: MlsGroupState::PendingCommit(Box::new(PendingCommitState::External(

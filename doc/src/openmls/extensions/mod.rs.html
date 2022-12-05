@@ -341,72 +341,6 @@
 <span id="341">341</span>
 <span id="342">342</span>
 <span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
-<span id="382">382</span>
-<span id="383">383</span>
-<span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
 </pre><pre class="rust"><code><span class="doccomment">//! # Extensions
 //!
 //! In MLS, extensions appear in the following places:
@@ -423,27 +357,24 @@
 //!
 //! OpenMLS supports the following extensions:
 //!
-//! - [`CapabilitiesExtension`] (KeyPackage extension)
-//! - [`ExternalKeyIdExtension`] (KeyPackage extension)
-//! - [`LifetimeExtension`] (KeyPackage extension)
-//! - [`ParentHashExtension`] (KeyPackage extension)
+//! - [`ApplicationIdExtension`] (KeyPackage extension)
 //! - [`RatchetTreeExtension`] (GroupInfo extension)
 //! - [`RequiredCapabilitiesExtension`] (GroupContext extension)
+//! - [`ExternalPubExtension`] (GroupInfo extension)
+//! - [`CapabilitiesExtension`] (KeyPackage extension)
+//! - [`LifetimeExtension`] (KeyPackage extension)
 
-</span><span class="kw">use </span>openmls_traits::crypto::OpenMlsCrypto;
-<span class="kw">use </span>serde::{Deserialize, Serialize};
-<span class="kw">use </span>std::{
-    convert::TryFrom,
-    fmt::Debug,
-    io::{Read, Write},
-};
+</span><span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>std::{convert::TryFrom, fmt::Debug};
 <span class="kw">use </span>tls_codec::<span class="kw-2">*</span>;
 
 <span class="comment">// Private
-</span><span class="kw">mod </span>capabilities_extension;
-<span class="kw">mod </span>external_key_id_extension;
+</span><span class="kw">mod </span>application_id_extension;
+<span class="kw">mod </span>capabilities_extension;
+<span class="kw">mod </span>codec;
+<span class="kw">mod </span>external_pub_extension;
+<span class="kw">mod </span>external_sender_extension;
 <span class="kw">mod </span>life_time_extension;
-<span class="kw">mod </span>parent_hash_extension;
 <span class="kw">mod </span>ratchet_tree_extension;
 <span class="kw">mod </span>required_capabilities;
 <span class="kw">use </span>errors::<span class="kw-2">*</span>;
@@ -452,10 +383,11 @@
 </span><span class="kw">pub mod </span>errors;
 
 <span class="comment">// Public re-exports
-</span><span class="kw">pub use </span>capabilities_extension::CapabilitiesExtension;
-<span class="kw">pub use </span>external_key_id_extension::ExternalKeyIdExtension;
+</span><span class="kw">pub use </span>application_id_extension::ApplicationIdExtension;
+<span class="kw">pub use </span>capabilities_extension::CapabilitiesExtension;
+<span class="kw">pub use </span>external_pub_extension::ExternalPubExtension;
+<span class="kw">pub use </span>external_sender_extension::ExternalSendersExtension;
 <span class="kw">pub use </span>life_time_extension::LifetimeExtension;
-<span class="kw">pub use </span>parent_hash_extension::ParentHashExtension;
 <span class="kw">pub use </span>ratchet_tree_extension::RatchetTreeExtension;
 <span class="kw">pub use </span>required_capabilities::RequiredCapabilitiesExtension;
 
@@ -477,6 +409,8 @@
 /// | 0x0004           | external_pub             | GI         | Y           | RFC XXXX  |
 /// | 0x0005           | external_senders         | GC         | Y           | RFC XXXX  |
 /// | 0xff00  - 0xffff | Reserved for Private Use | N/A        | N/A         | RFC XXXX  |
+///
+/// Note: OpenMLS does not provide a `Reserved` variant in [ExtensionType].
 </span><span class="attribute">#[derive(
     Debug,
     Copy,
@@ -494,33 +428,36 @@
 )]
 #[repr(u16)]
 </span><span class="kw">pub enum </span>ExtensionType {
-    <span class="doccomment">/// Reserved. This must not be used.
-    </span>Reserved = <span class="number">0</span>,
+    <span class="doccomment">/// The application id extension allows applications to add an explicit,
+    /// application-defined identifier to a KeyPackage.
+    </span>ApplicationId = <span class="number">1</span>,
+
+    <span class="doccomment">/// The ratchet tree extensions provides the whole public state of the ratchet
+    /// tree.
+    </span>RatchetTree = <span class="number">2</span>,
+
+    <span class="doccomment">/// The required capabilities extension defines the configuration of a group
+    /// that imposes certain requirements on clients in the group.
+    </span>RequiredCapabilities = <span class="number">3</span>,
+
+    <span class="doccomment">/// To join a group via an External Commit, a new member needs a GroupInfo
+    /// with an ExternalPub extension present in its extensions field.
+    </span>ExternalPub = <span class="number">4</span>,
+
+    <span class="doccomment">/// Group context extension that contains the credentials and signature keys
+    /// of senders that are permitted to send external proposals to the group.
+    </span>ExternalSenders = <span class="number">5</span>,
 
     <span class="doccomment">/// The capabilities extension indicates what protocol versions, ciphersuites,
     /// protocol extensions, and non-default proposal types are supported by a
     /// client.
-    </span>Capabilities = <span class="number">1</span>,
+    /// TODO(#819): This extension will be deleted.
+    </span>Capabilities = <span class="number">0xff00</span>,
 
     <span class="doccomment">/// The lifetime extension represents the times between which clients will
     /// consider a KeyPackage valid.
-    </span>Lifetime = <span class="number">2</span>,
-
-    <span class="doccomment">/// The external key id extension allows applications to add an explicit,
-    /// application-defined identifier to a KeyPackage.
-    </span>ExternalKeyId = <span class="number">3</span>,
-
-    <span class="doccomment">/// The parent hash extension carries information to authenticate the
-    /// structure of the tree, as described below.
-    </span>ParentHash = <span class="number">4</span>,
-
-    <span class="doccomment">/// The ratchet tree extensions provides the whole public state of the ratchet
-    /// tree.
-    </span>RatchetTree = <span class="number">5</span>,
-
-    <span class="doccomment">/// The required capabilities extension defines the configuration of a group
-    /// that imposes certain requirements on clients in the group.
-    </span>RequiredCapabilities = <span class="number">6</span>,
+    /// TODO(#819): This extension will be deleted.
+    </span>Lifetime = <span class="number">0xff01</span>,
 }
 
 <span class="kw">impl </span>TryFrom&lt;u16&gt; <span class="kw">for </span>ExtensionType {
@@ -531,12 +468,13 @@
     /// Note that this returns a [`tls_codec::Error`](`tls_codec::Error`).
     </span><span class="kw">fn </span>try_from(a: u16) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
         <span class="kw">match </span>a {
-            <span class="number">0 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::Reserved),
-            <span class="number">1 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::Capabilities),
-            <span class="number">2 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::Lifetime),
-            <span class="number">3 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::ExternalKeyId),
-            <span class="number">4 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::ParentHash),
-            <span class="number">5 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::RatchetTree),
+            <span class="number">1 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::ApplicationId),
+            <span class="number">2 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::RatchetTree),
+            <span class="number">3 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::RequiredCapabilities),
+            <span class="number">4 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::ExternalPub),
+            <span class="number">5 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::ExternalSenders),
+            <span class="number">0xff00 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::Capabilities),
+            <span class="number">0xff01 </span>=&gt; <span class="prelude-val">Ok</span>(ExtensionType::Lifetime),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(tls_codec::Error::DecodingError(<span class="macro">format!</span>(
                 <span class="string">&quot;{} is an unkown extension type&quot;</span>,
                 a
@@ -549,13 +487,13 @@
     <span class="doccomment">/// Check whether an [`ExtensionType`] is supported or not.
     </span><span class="kw">pub fn </span>is_supported(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">match </span><span class="self">self </span>{
-            ExtensionType::Reserved
-            | ExtensionType::Capabilities
-            | ExtensionType::Lifetime
-            | ExtensionType::ExternalKeyId
-            | ExtensionType::ParentHash
+            ExtensionType::ApplicationId
             | ExtensionType::RatchetTree
-            | ExtensionType::RequiredCapabilities =&gt; <span class="bool-val">true</span>,
+            | ExtensionType::RequiredCapabilities
+            | ExtensionType::ExternalPub
+            | ExtensionType::ExternalSenders
+            | ExtensionType::Capabilities
+            | ExtensionType::Lifetime =&gt; <span class="bool-val">true</span>,
         }
     }
 }
@@ -576,106 +514,43 @@
 /// ```
 </span><span class="attribute">#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 </span><span class="kw">pub enum </span>Extension {
-    <span class="doccomment">/// A [`CapabilitiesExtension`]
-    </span>Capabilities(CapabilitiesExtension),
-
-    <span class="doccomment">/// An [`ExternalKeyIdExtension`]
-    </span>ExternalKeyId(ExternalKeyIdExtension),
-
-    <span class="doccomment">/// A [`LifetimeExtension`]
-    </span>LifeTime(LifetimeExtension),
-
-    <span class="doccomment">/// A [`ParentHashExtension`]
-    </span>ParentHash(ParentHashExtension),
+    <span class="doccomment">/// An [`ApplicationIdExtension`]
+    </span>ApplicationId(ApplicationIdExtension),
 
     <span class="doccomment">/// A [`RatchetTreeExtension`]
     </span>RatchetTree(RatchetTreeExtension),
 
     <span class="doccomment">/// A [`RequiredCapabilitiesExtension`]
     </span>RequiredCapabilities(RequiredCapabilitiesExtension),
-}
 
-<span class="kw">impl </span>tls_codec::Size <span class="kw">for </span>Extension {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>tls_serialized_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="number">2 </span><span class="comment">/* extension type len */
-        </span>+ <span class="number">4 </span><span class="comment">/* u32 len */ </span>+
-        <span class="kw">match </span><span class="self">self </span>{
-            Extension::Capabilities(e) =&gt; e.tls_serialized_len(),
-            Extension::ExternalKeyId(e) =&gt; e.tls_serialized_len(),
-            Extension::LifeTime(e) =&gt; e.tls_serialized_len(),
-            Extension::ParentHash(e) =&gt; e.tls_serialized_len(),
-            Extension::RatchetTree(e) =&gt; e.tls_serialized_len(),
-            Extension::RequiredCapabilities(e) =&gt; e.tls_serialized_len(),
-        }
-    }
-}
+    <span class="doccomment">/// A [`ExternalPubExtension`]
+    </span>ExternalPub(ExternalPubExtension),
 
-<span class="kw">impl </span>tls_codec::Serialize <span class="kw">for </span>Extension {
-    <span class="kw">fn </span>tls_serialize&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, tls_codec::Error&gt; {
-        <span class="comment">// First write the extension type.
-        </span><span class="kw">let </span>written = <span class="self">self</span>.extension_type().tls_serialize(writer)<span class="question-mark">?</span>;
+    <span class="doccomment">/// A [`ExternalPubExtension`]
+    </span>ExternalSenders(ExternalSendersExtension),
 
-        <span class="comment">// Now serialize the extension into a separate byte vector.
-        </span><span class="kw">let </span>extension_data_len = <span class="self">self</span>.tls_serialized_len() - <span class="number">6 </span><span class="comment">/* extension type length and u32 length */</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>extension_data = Vec::with_capacity(extension_data_len);
+    <span class="doccomment">/// A [`CapabilitiesExtension`]
+    /// TODO(#819): This extension will be deleted.
+    </span>Capabilities(CapabilitiesExtension),
 
-        <span class="kw">let </span>extension_data_written = <span class="kw">match </span><span class="self">self </span>{
-            Extension::Capabilities(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-            Extension::ExternalKeyId(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-            Extension::LifeTime(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-            Extension::ParentHash(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-            Extension::RatchetTree(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-            Extension::RequiredCapabilities(e) =&gt; e.tls_serialize(<span class="kw-2">&amp;mut </span>extension_data),
-        }<span class="question-mark">?</span>;
-        <span class="macro">debug_assert_eq!</span>(extension_data_written, extension_data_len);
-        <span class="macro">debug_assert_eq!</span>(extension_data_written, extension_data.len());
-
-        <span class="comment">// Write the serialized extension out.
-        </span>TlsSliceU32(<span class="kw-2">&amp;</span>extension_data)
-            .tls_serialize(writer)
-            .map(|l| l + written)
-    }
-}
-
-<span class="kw">impl </span>tls_codec::Deserialize <span class="kw">for </span>Extension {
-    <span class="kw">fn </span>tls_deserialize&lt;R: Read&gt;(bytes: <span class="kw-2">&amp;mut </span>R) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, tls_codec::Error&gt; {
-        <span class="comment">// Read the extension type and extension data.
-        </span><span class="kw">let </span>extension_type = ExtensionType::tls_deserialize(bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>extension_data = TlsByteVecU32::tls_deserialize(bytes)<span class="question-mark">?</span>;
-
-        <span class="comment">// Now deserialize the extension itself from the extension data.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>extension_data = extension_data.as_slice();
-        <span class="prelude-val">Ok</span>(<span class="kw">match </span>extension_type {
-            ExtensionType::Capabilities =&gt; Extension::Capabilities(
-                CapabilitiesExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>,
-            ),
-            ExtensionType::ExternalKeyId =&gt; Extension::ExternalKeyId(
-                ExternalKeyIdExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>,
-            ),
-            ExtensionType::Lifetime =&gt; {
-                Extension::LifeTime(LifetimeExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>)
-            }
-            ExtensionType::ParentHash =&gt; {
-                Extension::ParentHash(ParentHashExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>)
-            }
-            ExtensionType::RatchetTree =&gt; {
-                Extension::RatchetTree(RatchetTreeExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>)
-            }
-            ExtensionType::RequiredCapabilities =&gt; Extension::RequiredCapabilities(
-                RequiredCapabilitiesExtension::tls_deserialize(<span class="kw-2">&amp;mut </span>extension_data)<span class="question-mark">?</span>,
-            ),
-            ExtensionType::Reserved =&gt; {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(tls_codec::Error::DecodingError(<span class="macro">format!</span>(
-                    <span class="string">&quot;{:?} is not a valid extension type&quot;</span>,
-                    extension_type
-                )))
-            }
-        })
-    }
+    <span class="doccomment">/// A [`LifetimeExtension`]
+    /// TODO(#819): This extension will be deleted.
+    </span>Lifetime(LifetimeExtension),
 }
 
 <span class="kw">impl </span>Extension {
+    <span class="doccomment">/// Get a reference to this extension as [`ApplicationIdExtension`].
+    /// Returns an [`ExtensionError::InvalidExtensionType`] if called on an
+    /// [`Extension`] that&#39;s not an [`ApplicationIdExtension`].
+    </span><span class="kw">pub fn </span>as_application_id_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>ApplicationIdExtension, ExtensionError&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::ApplicationId(e) =&gt; <span class="prelude-val">Ok</span>(e),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
+                <span class="string">&quot;This is not an ApplicationIdExtension&quot;</span>.into(),
+            )),
+        }
+    }
+
     <span class="doccomment">/// Get a reference to this extension as [`RatchetTreeExtension`].
     /// Returns an [`ExtensionError::InvalidExtensionType`] if called on
     /// an [`Extension`] that&#39;s not a [`RatchetTreeExtension`].
@@ -684,54 +559,6 @@
             <span class="self">Self</span>::RatchetTree(rte) =&gt; <span class="prelude-val">Ok</span>(rte),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
                 <span class="string">&quot;This is not a RatchetTreeExtension&quot;</span>.into(),
-            )),
-        }
-    }
-
-    <span class="doccomment">/// Get a reference to this extension as [`LifetimeExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] if called on an
-    /// [`Extension`] that&#39;s not a [`LifetimeExtension`].
-    </span><span class="kw">pub fn </span>as_lifetime_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>LifetimeExtension, ExtensionError&gt; {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="self">Self</span>::LifeTime(e) =&gt; <span class="prelude-val">Ok</span>(e),
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
-                <span class="string">&quot;This is not a LifetimeExtension&quot;</span>.into(),
-            )),
-        }
-    }
-
-    <span class="doccomment">/// Get a reference to this extension as [`ExternalKeyIdExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] if called on an
-    /// [`Extension`] that&#39;s not an [`ExternalKeyIdExtension`].
-    </span><span class="kw">pub fn </span>as_external_key_id_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>ExternalKeyIdExtension, ExtensionError&gt; {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="self">Self</span>::ExternalKeyId(e) =&gt; <span class="prelude-val">Ok</span>(e),
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
-                <span class="string">&quot;This is not an ExternalKeyIdExtension&quot;</span>.into(),
-            )),
-        }
-    }
-
-    <span class="doccomment">/// Get a reference to this extension as [`CapabilitiesExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on an
-    /// [`Extension`] that&#39;s not a [`CapabilitiesExtension`].
-    </span><span class="kw">pub fn </span>as_capabilities_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>CapabilitiesExtension, ExtensionError&gt; {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="self">Self</span>::Capabilities(e) =&gt; <span class="prelude-val">Ok</span>(e),
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
-                <span class="string">&quot;This is not a CapabilitiesExtension&quot;</span>.into(),
-            )),
-        }
-    }
-
-    <span class="doccomment">/// Get a reference to this extension as [`ParentHashExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on an
-    /// [`Extension`] that&#39;s not a [`ParentHashExtension`].
-    </span><span class="kw">pub fn </span>as_parent_hash_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>ParentHashExtension, ExtensionError&gt; {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="self">Self</span>::ParentHash(e) =&gt; <span class="prelude-val">Ok</span>(e),
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
-                <span class="string">&quot;This is not a ParentHashExtension&quot;</span>.into(),
             )),
         }
     }
@@ -750,16 +577,67 @@
         }
     }
 
+    <span class="doccomment">/// Get a reference to this extension as [`ExternalPubExtension`].
+    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on an
+    /// [`Extension`] that&#39;s not a [`ExternalPubExtension`].
+    </span><span class="kw">pub fn </span>as_external_pub_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>ExternalPubExtension, ExtensionError&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::ExternalPub(e) =&gt; <span class="prelude-val">Ok</span>(e),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
+                <span class="string">&quot;This is not an ExternalPubExtension&quot;</span>.into(),
+            )),
+        }
+    }
+
+    <span class="doccomment">/// Get a reference to this extension as [`ExternalSendersExtension`].
+    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on an
+    /// [`Extension`] that&#39;s not a [`ExternalSendersExtension`].
+    </span><span class="kw">pub fn </span>as_external_senders_extension(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>ExternalSendersExtension, ExtensionError&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::ExternalSenders(e) =&gt; <span class="prelude-val">Ok</span>(e),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
+                <span class="string">&quot;This is not an ExternalSendersExtension&quot;</span>.into(),
+            )),
+        }
+    }
+
+    <span class="doccomment">/// Get a reference to this extension as [`CapabilitiesExtension`].
+    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on an
+    /// [`Extension`] that&#39;s not a [`CapabilitiesExtension`].
+    </span><span class="kw">pub fn </span>as_capabilities_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>CapabilitiesExtension, ExtensionError&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Capabilities(e) =&gt; <span class="prelude-val">Ok</span>(e),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
+                <span class="string">&quot;This is not a CapabilitiesExtension&quot;</span>.into(),
+            )),
+        }
+    }
+
+    <span class="doccomment">/// Get a reference to this extension as [`LifetimeExtension`].
+    /// Returns an [`ExtensionError::InvalidExtensionType`] if called on an
+    /// [`Extension`] that&#39;s not a [`LifetimeExtension`].
+    </span><span class="kw">pub fn </span>as_lifetime_extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>LifetimeExtension, ExtensionError&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Lifetime(e) =&gt; <span class="prelude-val">Ok</span>(e),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(ExtensionError::InvalidExtensionType(
+                <span class="string">&quot;This is not a LifetimeExtension&quot;</span>.into(),
+            )),
+        }
+    }
+
     <span class="doccomment">/// Returns the [`ExtensionType`]
     </span><span class="attribute">#[inline]
     </span><span class="kw">pub const fn </span>extension_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ExtensionType {
         <span class="kw">match </span><span class="self">self </span>{
-            Extension::Capabilities(<span class="kw">_</span>) =&gt; ExtensionType::Capabilities,
-            Extension::ExternalKeyId(<span class="kw">_</span>) =&gt; ExtensionType::ExternalKeyId,
-            Extension::LifeTime(<span class="kw">_</span>) =&gt; ExtensionType::Lifetime,
-            Extension::ParentHash(<span class="kw">_</span>) =&gt; ExtensionType::ParentHash,
+            Extension::ApplicationId(<span class="kw">_</span>) =&gt; ExtensionType::ApplicationId,
             Extension::RatchetTree(<span class="kw">_</span>) =&gt; ExtensionType::RatchetTree,
             Extension::RequiredCapabilities(<span class="kw">_</span>) =&gt; ExtensionType::RequiredCapabilities,
+            Extension::ExternalPub(<span class="kw">_</span>) =&gt; ExtensionType::ExternalPub,
+            Extension::ExternalSenders(<span class="kw">_</span>) =&gt; ExtensionType::ExternalSenders,
+            Extension::Capabilities(<span class="kw">_</span>) =&gt; ExtensionType::Capabilities,
+            Extension::Lifetime(<span class="kw">_</span>) =&gt; ExtensionType::Lifetime,
         }
     }
 }
@@ -785,23 +663,13 @@
 /// error if there is either no [`RatchetTreeExtension`] or more than one.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>try_nodes_from_extensions(
     other_extensions: <span class="kw-2">&amp;</span>[Extension],
-    crypto_backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCrypto,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;Node&gt;&gt;&gt;, ExtensionError&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>ratchet_tree_extensions = other_extensions
         .iter()
         .filter(|e| e.extension_type() == ExtensionType::RatchetTree);
 
     <span class="kw">let </span>nodes = <span class="kw">match </span>ratchet_tree_extensions.next() {
-        <span class="prelude-val">Some</span>(e) =&gt; {
-            <span class="kw">let </span><span class="kw-2">mut </span>nodes: Vec&lt;<span class="prelude-ty">Option</span>&lt;Node&gt;&gt; = e.as_ratchet_tree_extension()<span class="question-mark">?</span>.as_slice().into();
-            <span class="comment">// Compute the key package references.
-            </span><span class="kw">for </span>node <span class="kw">in </span>nodes.iter_mut().flatten() {
-                <span class="kw">if let </span>Node::LeafNode(leaf) = node {
-                    leaf.set_key_package_ref(crypto_backend)<span class="question-mark">?</span>;
-                }
-            }
-            <span class="prelude-val">Some</span>(nodes)
-        }
+        <span class="prelude-val">Some</span>(e) =&gt; <span class="prelude-val">Some</span>(e.as_ratchet_tree_extension()<span class="question-mark">?</span>.as_slice().into()),
         <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
     };
 

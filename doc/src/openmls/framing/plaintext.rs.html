@@ -853,24 +853,55 @@
 <span id="853">853</span>
 <span id="854">854</span>
 <span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
 </pre><pre class="rust"><code><span class="doccomment">//! # MlsPlaintext
 //!
 //! An MlsPlaintext is a framing structure for MLS messages. It can contain
 //! Proposals, Commits and application messages.
 
 </span><span class="kw">use crate</span>::{
-    ciphersuite::{
-        hash_ref::KeyPackageRef,
-        signable::{Signable, SignedStruct, Verifiable, VerifiedStruct},
-    },
+    ciphersuite::signable::{Signable, SignedStruct, Verifiable, VerifiedStruct},
     error::LibraryError,
     group::errors::ValidationError,
 };
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span>openmls_traits::OpenMlsCryptoProvider;
-<span class="kw">use </span>std::convert::TryFrom;
-<span class="kw">use </span>tls_codec::{Serialize, TlsByteVecU32, TlsDeserialize, TlsSerialize, TlsSize};
+<span class="kw">use </span>std::{
+    convert::TryFrom,
+    io::{Read, Write},
+};
+<span class="kw">use </span>tls_codec::{Deserialize, Serialize, TlsByteVecU32, TlsDeserialize, TlsSerialize, TlsSize};
 
 <span class="doccomment">/// `MLSPlaintext` is a framing structure for MLS messages. It can contain
 /// Proposals, Commits and application messages.
@@ -882,8 +913,7 @@
 ///
 /// struct {
 ///     MLSContent content;
-///     opaque signature&lt;0..2^16-1&gt;;
-///     optional&lt;MAC&gt; confirmation_tag;
+///     MLSContentAuthData auth;
 ///     optional&lt;MAC&gt; membership_tag;
 /// } MLSPlaintext;
 /// ```
@@ -891,8 +921,7 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsPlaintext {
     wire_format: WireFormat,
     content: MlsContent,
-    signature: Signature,
-    confirmation_tag: <span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;,
+    auth: MlsContentAuthData,
     membership_tag: <span class="prelude-ty">Option</span>&lt;MembershipTag&gt;,
 }
 
@@ -914,7 +943,7 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) group_id: GroupId,
     <span class="kw">pub</span>(<span class="kw">crate</span>) epoch: GroupEpoch,
     <span class="kw">pub</span>(<span class="kw">crate</span>) sender: Sender,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) authenticated_data: TlsByteVecU32,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) authenticated_data: VLBytes,
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) body: MlsContentBody,
 }
@@ -956,6 +985,37 @@
             <span class="self">Self</span>::Commit(<span class="kw">_</span>) =&gt; ContentType::Commit,
         }
     }
+
+    <span class="doccomment">/// Returns the length of the serialized content without the `content_type` field.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>serialized_len_without_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">match </span><span class="self">self </span>{
+            MlsContentBody::Application(a) =&gt; a.tls_serialized_len(),
+            MlsContentBody::Proposal(p) =&gt; p.tls_serialized_len(),
+            MlsContentBody::Commit(c) =&gt; c.tls_serialized_len(),
+        }
+    }
+
+    <span class="doccomment">/// Serializes the content without the `content_type` field.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>serialize_without_type&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W) -&gt; <span class="prelude-ty">Result</span>&lt;usize, Error&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            MlsContentBody::Application(a) =&gt; a.tls_serialize(writer),
+            MlsContentBody::Proposal(p) =&gt; p.tls_serialize(writer),
+            MlsContentBody::Commit(c) =&gt; c.tls_serialize(writer),
+        }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>deserialize_without_type&lt;R: Read&gt;(
+        bytes: <span class="kw-2">&amp;mut </span>R,
+        content_type: ContentType,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, tls_codec::Error&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span>content_type {
+            ContentType::Application =&gt; {
+                MlsContentBody::Application(TlsByteVecU32::tls_deserialize(bytes)<span class="question-mark">?</span>)
+            }
+            ContentType::Proposal =&gt; MlsContentBody::Proposal(Proposal::tls_deserialize(bytes)<span class="question-mark">?</span>),
+            ContentType::Commit =&gt; MlsContentBody::Commit(Commit::tls_deserialize(bytes)<span class="question-mark">?</span>),
+        })
+    }
 }
 
 <span class="kw">impl </span>From&lt;MlsPlaintext&gt; <span class="kw">for </span>MlsContentBody {
@@ -966,13 +1026,13 @@
 
 <span class="comment">// This block only has pub(super) getters.
 </span><span class="kw">impl </span>MlsPlaintext {
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>signature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Signature {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.signature
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>auth(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MlsContentAuthData {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.auth
     }
 
     <span class="attribute">#[cfg(test)]
     </span><span class="kw">pub fn </span>test_signature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Signature {
-        <span class="self">self</span>.signature()
+        <span class="kw-2">&amp;</span><span class="self">self</span>.auth.signature
     }
 
     <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>wire_format(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; WireFormat {
@@ -981,7 +1041,7 @@
 
     <span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>unset_confirmation_tag(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.confirmation_tag = <span class="prelude-val">None</span>;
+        <span class="self">self</span>.auth.confirmation_tag = <span class="prelude-val">None</span>;
     }
 
     <span class="attribute">#[cfg(test)]
@@ -1017,7 +1077,7 @@
         context: <span class="kw-2">&amp;</span>GroupContext,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LibraryError&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>mls_plaintext = MlsPlaintextTbs::new(
+        <span class="kw">let </span><span class="kw-2">mut </span>mls_plaintext = MlsContentTbs::new(
             framing_parameters.wire_format(),
             context.group_id().clone(),
             context.epoch(),
@@ -1040,14 +1100,14 @@
     </span><span class="attribute">#[inline]
     </span><span class="kw">fn </span>new_with_membership_tag(
         framing_parameters: FramingParameters,
-        sender_reference: <span class="kw-2">&amp;</span>KeyPackageRef,
+        sender_leaf_index: u32,
         body: MlsContentBody,
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
         context: <span class="kw-2">&amp;</span>GroupContext,
         membership_key: <span class="kw-2">&amp;</span>MembershipKey,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LibraryError&gt; {
-        <span class="kw">let </span>sender = Sender::build_member(sender_reference);
+        <span class="kw">let </span>sender = Sender::build_member(sender_leaf_index);
         <span class="kw">let </span><span class="kw-2">mut </span>mls_plaintext = <span class="self">Self</span>::new(
             framing_parameters,
             sender,
@@ -1070,7 +1130,7 @@
     /// The sender type is always `SenderType::Member`.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>member_proposal(
         framing_parameters: FramingParameters,
-        sender_reference: <span class="kw-2">&amp;</span>KeyPackageRef,
+        sender_leaf_index: u32,
         proposal: Proposal,
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
         context: <span class="kw-2">&amp;</span>GroupContext,
@@ -1079,7 +1139,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LibraryError&gt; {
         <span class="self">Self</span>::new_with_membership_tag(
             framing_parameters,
-            sender_reference,
+            sender_leaf_index,
             MlsContentBody::Proposal(proposal),
             credential_bundle,
             context,
@@ -1088,9 +1148,32 @@
         )
     }
 
+    <span class="doccomment">/// This constructor builds an `MlsPlaintext` containing an External Proposal.
+    /// The sender is [Sender::NewMemberProposal].
+    </span><span class="comment">// TODO #151/#106: We don&#39;t support preconfigured senders yet
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new_external_proposal(
+        proposal: Proposal,
+        credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
+        group_id: GroupId,
+        epoch: GroupEpoch,
+        backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LibraryError&gt; {
+        <span class="kw">let </span>body = MlsContentBody::Proposal(proposal);
+
+        <span class="kw">let </span>message = MlsContentTbs::new(
+            WireFormat::MlsPlaintext,
+            group_id,
+            epoch,
+            Sender::NewMemberProposal,
+            <span class="macro">vec!</span>[].into(),
+            body,
+        );
+        message.sign(backend, credential_bundle)
+    }
+
     <span class="doccomment">/// This constructor builds an `MlsPlaintext` containing a Commit. If the
     /// given `CommitType` is `Member`, the `SenderType` is `Member` as well. If
-    /// it&#39;s an `External` commit, the `SenderType` is `NewMember`. If it is an
+    /// it&#39;s an `External` commit, the `SenderType` is `NewMemberCommit`. If it is an
     /// `External` commit, the context is not signed along with the rest of the
     /// commit.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>commit(
@@ -1114,7 +1197,7 @@
     <span class="doccomment">/// This constructor builds an `MlsPlaintext` containing an application
     /// message. The sender type is always `SenderType::Member`.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new_application(
-        sender_reference: <span class="kw-2">&amp;</span>KeyPackageRef,
+        sender_leaf_index: u32,
         authenticated_data: <span class="kw-2">&amp;</span>[u8],
         application_message: <span class="kw-2">&amp;</span>[u8],
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
@@ -1126,7 +1209,7 @@
             FramingParameters::new(authenticated_data, WireFormat::MlsCiphertext);
         <span class="self">Self</span>::new_with_membership_tag(
             framing_parameters,
-            sender_reference,
+            sender_leaf_index,
             MlsContentBody::Application(application_message.into()),
             credential_bundle,
             context,
@@ -1157,11 +1240,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), LibraryError&gt; {
         <span class="kw">let </span>tbs_payload =
             encode_tbs(<span class="self">self</span>, serialized_context).map_err(LibraryError::missing_bound_check)<span class="question-mark">?</span>;
-        <span class="kw">let </span>tbm_payload = MlsPlaintextTbmPayload::new(
-            <span class="kw-2">&amp;</span>tbs_payload,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.signature,
-            <span class="self">self</span>.confirmation_tag.as_ref(),
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>tbm_payload = MlsContentTbm::new(<span class="kw-2">&amp;</span>tbs_payload, <span class="kw-2">&amp;</span><span class="self">self</span>.auth)<span class="question-mark">?</span>;
         <span class="kw">let </span>membership_tag = membership_key.tag(backend, tbm_payload)<span class="question-mark">?</span>;
 
         <span class="self">self</span>.membership_tag = <span class="prelude-val">Some</span>(membership_tag);
@@ -1187,11 +1266,11 @@
 
     <span class="doccomment">/// Set the confirmation tag.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_confirmation_tag(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tag: ConfirmationTag) {
-        <span class="self">self</span>.confirmation_tag = <span class="prelude-val">Some</span>(tag)
+        <span class="self">self</span>.auth.confirmation_tag = <span class="prelude-val">Some</span>(tag)
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>confirmation_tag(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ConfirmationTag&gt; {
-        <span class="self">self</span>.confirmation_tag.as_ref()
+        <span class="self">self</span>.auth.confirmation_tag.as_ref()
     }
 
     <span class="doccomment">/// The authenticated data of this MlsPlaintext as byte slice.
@@ -1248,39 +1327,33 @@
     }
 }
 
-<span class="doccomment">/// 9.1 Content Authentication
+<span class="doccomment">/// 7.2 Encoding and Decoding a Plaintext
 ///
 /// ```c
+/// // draft-ietf-mls-protocol-16
+///
 /// struct {
-///   MLSPlaintextTBS tbs;
-///   opaque signature&lt;0..2^16-1&gt;;
-///   optional&lt;MAC&gt; confirmation_tag;
-/// } MLSPlaintextTBM;
+///   MLSContentTBS tbs;
+///   MLSContentAuthData auth;
+/// } MLSContentTBM;
 /// ```
 </span><span class="attribute">#[derive(Debug)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsPlaintextTbmPayload&lt;<span class="lifetime">&#39;a</span>&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsContentTbm&lt;<span class="lifetime">&#39;a</span>&gt; {
     tbs_payload: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8],
-    signature: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Signature,
-    confirmation_tag: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag&gt;,
+    auth: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsContentAuthData,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; MlsPlaintextTbmPayload&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; MlsContentTbm&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tbs_payload: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8],
-        signature: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Signature,
-        confirmation_tag: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag&gt;,
+        auth: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsContentAuthData,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, LibraryError&gt; {
-        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
-            tbs_payload,
-            signature,
-            confirmation_tag,
-        })
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{ tbs_payload, auth })
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>into_bytes(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, tls_codec::Error&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>buffer = <span class="self">self</span>.tbs_payload.to_vec();
-        <span class="self">self</span>.signature.tls_serialize(<span class="kw-2">&amp;mut </span>buffer)<span class="question-mark">?</span>;
-        <span class="self">self</span>.confirmation_tag.tls_serialize(<span class="kw-2">&amp;mut </span>buffer)<span class="question-mark">?</span>;
+        <span class="self">self</span>.auth.tls_serialize(<span class="kw-2">&amp;mut </span>buffer)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(buffer)
     }
 }
@@ -1292,14 +1365,10 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MembershipTag(<span class="kw">pub</span>(<span class="kw">crate</span>) Mac);
 
 <span class="attribute">#[derive(PartialEq, Debug, Clone)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsPlaintextTbs {
-    <span class="kw">pub</span>(<span class="kw">super</span>) serialized_context: <span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;,
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsContentTbs {
     <span class="kw">pub</span>(<span class="kw">super</span>) wire_format: WireFormat,
-    <span class="kw">pub</span>(<span class="kw">super</span>) group_id: GroupId,
-    <span class="kw">pub</span>(<span class="kw">super</span>) epoch: GroupEpoch,
-    <span class="kw">pub</span>(<span class="kw">super</span>) sender: Sender,
-    <span class="kw">pub</span>(<span class="kw">super</span>) authenticated_data: TlsByteVecU32,
-    <span class="kw">pub</span>(<span class="kw">super</span>) body: MlsContentBody,
+    <span class="kw">pub</span>(<span class="kw">super</span>) content: MlsContent,
+    <span class="kw">pub</span>(<span class="kw">super</span>) serialized_context: <span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;,
 }
 
 <span class="kw">fn </span>encode_tbs&lt;<span class="lifetime">&#39;a</span>&gt;(
@@ -1308,66 +1377,89 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, tls_codec::Error&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>out = Vec::new();
     codec::serialize_plaintext_tbs(
-        serialized_context,
         plaintext.wire_format,
-        <span class="kw-2">&amp;</span>plaintext.content.group_id,
-        <span class="kw-2">&amp;</span>plaintext.content.epoch,
-        <span class="kw-2">&amp;</span>plaintext.content.sender,
-        <span class="kw-2">&amp;</span>plaintext.content.authenticated_data,
-        <span class="kw-2">&amp;</span>plaintext.content.body,
+        <span class="kw-2">&amp;</span>plaintext.content,
+        serialized_context,
         <span class="kw-2">&amp;mut </span>out,
     )<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(out)
 }
 
-<span class="attribute">#[derive(PartialEq, Debug, Clone)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>VerifiableMlsPlaintext {
-    <span class="kw">pub</span>(<span class="kw">super</span>) tbs: MlsPlaintextTbs,
+<span class="doccomment">/// 7.1 Content Authentication
+///
+/// ```c
+/// // draft-ietf-mls-protocol-16
+///
+/// struct {
+///    /* SignWithLabel(., &quot;MLSContentTBS&quot;, MLSContentTBS) */
+///    opaque signature&lt;V&gt;;
+///    select (MLSContent.content_type) {
+///        case commit:
+///            /*
+///              MAC(confirmation_key,
+///                  GroupContext.confirmed_transcript_hash)
+///            */
+///            MAC confirmation_tag;
+///        case application:
+///        case proposal:
+///            struct{};
+///    };
+///} MLSContentAuthData;
+/// ```
+</span><span class="attribute">#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsContentAuthData {
     <span class="kw">pub</span>(<span class="kw">super</span>) signature: Signature,
     <span class="kw">pub</span>(<span class="kw">super</span>) confirmation_tag: <span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;,
+}
+
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">impl </span>MlsContentAuthData {
+    <span class="kw">pub fn </span>new(signature: Signature, confirmation_tag: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            signature,
+            confirmation_tag: confirmation_tag.into(),
+        }
+    }
+}
+
+<span class="attribute">#[derive(PartialEq, Debug, Clone)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>VerifiableMlsAuthContent {
+    <span class="kw">pub</span>(<span class="kw">super</span>) tbs: MlsContentTbs,
+    <span class="kw">pub</span>(<span class="kw">super</span>) auth: MlsContentAuthData,
     <span class="kw">pub</span>(<span class="kw">super</span>) membership_tag: <span class="prelude-ty">Option</span>&lt;MembershipTag&gt;,
 }
 
-<span class="kw">impl </span>VerifiableMlsPlaintext {
-    <span class="doccomment">/// Create a new [`VerifiableMlsPlaintext`] from a [`MlsPlaintextTbs`] and
+<span class="kw">impl </span>VerifiableMlsAuthContent {
+    <span class="doccomment">/// Create a new [`VerifiableMlsAuthContent`] from a [`MlsContentTbs`] and
     /// a [`Signature`].
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
-        tbs: MlsPlaintextTbs,
-        signature: Signature,
-        confirmation_tag: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;&gt;,
+        tbs: MlsContentTbs,
+        auth: MlsContentAuthData,
         membership_tag: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;MembershipTag&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             tbs,
-            signature,
-            confirmation_tag: confirmation_tag.into(),
+            auth,
             membership_tag: membership_tag.into(),
         }
     }
 
-    <span class="doccomment">/// Create a [`VerifiableMlsPlaintext`] from an [`MlsPlaintext`] and the
+    <span class="doccomment">/// Create a [`VerifiableMlsAuthContent`] from an [`MlsPlaintext`] and the
     /// serialized context.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>from_plaintext(
         mls_plaintext: MlsPlaintext,
         serialized_context: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>signature = mls_plaintext.signature.clone();
-        <span class="kw">let </span>membership_tag = mls_plaintext.membership_tag.clone();
-        <span class="kw">let </span>confirmation_tag = mls_plaintext.confirmation_tag.clone();
+        <span class="kw">let </span>tbs = MlsContentTbs {
+            wire_format: mls_plaintext.wire_format,
+            content: mls_plaintext.content,
+            serialized_context: serialized_context.into(),
+        };
 
-        <span class="kw">match </span>serialized_context.into() {
-            <span class="prelude-val">Some</span>(context) =&gt; <span class="self">Self </span>{
-                tbs: MlsPlaintextTbs::from_plaintext(mls_plaintext).with_context(context),
-                signature,
-                confirmation_tag,
-                membership_tag,
-            },
-            <span class="prelude-val">None </span>=&gt; <span class="self">Self </span>{
-                tbs: MlsPlaintextTbs::from_plaintext(mls_plaintext),
-                signature,
-                confirmation_tag,
-                membership_tag,
-            },
+        <span class="self">Self </span>{
+            tbs,
+            auth: mls_plaintext.auth,
+            membership_tag: mls_plaintext.membership_tag,
         }
     }
 
@@ -1388,11 +1480,7 @@
             </span>.tbs
             .tls_serialize_detached()
             .map_err(LibraryError::missing_bound_check)<span class="question-mark">?</span>;
-        <span class="kw">let </span>tbm_payload = MlsPlaintextTbmPayload::new(
-            <span class="kw-2">&amp;</span>tbs_payload,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.signature,
-            <span class="self">self</span>.confirmation_tag.as_ref(),
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>tbm_payload = MlsContentTbm::new(<span class="kw-2">&amp;</span>tbs_payload, <span class="kw-2">&amp;</span><span class="self">self</span>.auth)<span class="question-mark">?</span>;
         <span class="kw">let </span>expected_membership_tag = <span class="kw-2">&amp;</span>membership_key.tag(backend, tbm_payload)<span class="question-mark">?</span>;
 
         <span class="comment">// Verify the membership tag
@@ -1409,24 +1497,24 @@
 
     <span class="doccomment">/// Get the [`Sender`].
     </span><span class="kw">pub fn </span>sender(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Sender {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.sender
+        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.content.sender
     }
 
     <span class="doccomment">/// Set the sender.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_sender(<span class="kw-2">&amp;mut </span><span class="self">self</span>, sender: Sender) {
-        <span class="self">self</span>.tbs.sender = sender;
+        <span class="self">self</span>.tbs.content.sender = sender;
     }
 
     <span class="doccomment">/// Get the group id as [`GroupId`].
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>group_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GroupId {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.group_id
+        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.content.group_id
     }
 
     <span class="doccomment">/// Set the group id.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_group_id(<span class="kw-2">&amp;mut </span><span class="self">self</span>, group_id: GroupId) {
-        <span class="self">self</span>.tbs.group_id = group_id;
+        <span class="self">self</span>.tbs.content.group_id = group_id;
     }
 
     <span class="doccomment">/// Set the serialized context before verifying the signature.
@@ -1448,18 +1536,18 @@
     <span class="doccomment">/// Set the epoch.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_epoch(<span class="kw-2">&amp;mut </span><span class="self">self</span>, epoch: u64) {
-        <span class="self">self</span>.tbs.epoch = epoch.into();
+        <span class="self">self</span>.tbs.content.epoch = epoch.into();
     }
 
     <span class="doccomment">/// Get the underlying MlsPlaintext data of the tbs object.
     </span><span class="attribute">#[cfg(test)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>payload(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MlsPlaintextTbs {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>payload(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MlsContentTbs {
         <span class="kw-2">&amp;</span><span class="self">self</span>.tbs
     }
 
     <span class="doccomment">/// Get the content of the message.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>content(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MlsContentBody {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.body
+        <span class="kw-2">&amp;</span><span class="self">self</span>.tbs.content.body
     }
 
     <span class="doccomment">/// Get the wire format.
@@ -1486,47 +1574,47 @@
 
     <span class="doccomment">/// Get the confirmation tag.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>confirmation_tag(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>ConfirmationTag&gt; {
-        <span class="self">self</span>.confirmation_tag.as_ref()
+        <span class="self">self</span>.auth.confirmation_tag.as_ref()
     }
 
     <span class="doccomment">/// Set the confirmation tag.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_confirmation_tag(<span class="kw-2">&amp;mut </span><span class="self">self</span>, confirmation_tag: <span class="prelude-ty">Option</span>&lt;ConfirmationTag&gt;) {
-        <span class="self">self</span>.confirmation_tag = confirmation_tag;
+        <span class="self">self</span>.auth.confirmation_tag = confirmation_tag;
     }
 
     <span class="doccomment">/// Get the content type
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>content_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ContentType {
-        <span class="self">self</span>.tbs.body.content_type()
+        <span class="self">self</span>.tbs.content.body.content_type()
     }
 
     <span class="doccomment">/// Set the content.
     </span><span class="attribute">#[cfg(test)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_content(<span class="kw-2">&amp;mut </span><span class="self">self</span>, content: MlsContentBody) {
-        <span class="self">self</span>.tbs.body = content;
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_content_body(<span class="kw-2">&amp;mut </span><span class="self">self</span>, body: MlsContentBody) {
+        <span class="self">self</span>.tbs.content.body = body;
     }
 
     <span class="doccomment">/// Get the signature.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>signature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Signature {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.signature
+        <span class="kw-2">&amp;</span><span class="self">self</span>.auth.signature
     }
 
     <span class="doccomment">/// Set the signature.
     </span><span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_signature(<span class="kw-2">&amp;mut </span><span class="self">self</span>, signature: Signature) {
-        <span class="self">self</span>.signature = signature;
+        <span class="self">self</span>.auth.signature = signature;
     }
 
     <span class="attribute">#[cfg(test)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>invalidate_signature(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span><span class="kw-2">mut </span>modified_signature = <span class="self">self</span>.signature().as_slice().to_vec();
         modified_signature[<span class="number">0</span>] ^= <span class="number">0xFF</span>;
-        <span class="self">self</span>.signature.modify(<span class="kw-2">&amp;</span>modified_signature);
+        <span class="self">self</span>.auth.signature.modify(<span class="kw-2">&amp;</span>modified_signature);
     }
 }
 
-<span class="kw">impl </span>Signable <span class="kw">for </span>MlsPlaintextTbs {
+<span class="kw">impl </span>Signable <span class="kw">for </span>MlsContentTbs {
     <span class="kw">type </span>SignedOutput = MlsPlaintext;
 
     <span class="kw">fn </span>unsigned_payload(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, tls_codec::Error&gt; {
@@ -1538,8 +1626,8 @@
     </span>}
 }
 
-<span class="kw">impl </span>MlsPlaintextTbs {
-    <span class="doccomment">/// Create an MlsPlaintextTbs from an existing values.
+<span class="kw">impl </span>MlsContentTbs {
+    <span class="doccomment">/// Create an MlsContentTbs from an existing values.
     /// Note that if you would like to add a serialized context, you
     /// should subsequently call [`with_context`].
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
@@ -1547,54 +1635,42 @@
         group_id: GroupId,
         epoch: <span class="kw">impl </span>Into&lt;GroupEpoch&gt;,
         sender: Sender,
-        authenticated_data: TlsByteVecU32,
+        authenticated_data: VLBytes,
         body: MlsContentBody,
     ) -&gt; <span class="self">Self </span>{
-        MlsPlaintextTbs {
-            serialized_context: <span class="prelude-val">None</span>,
-            wire_format,
+        <span class="kw">let </span>content = MlsContent {
             group_id,
             epoch: epoch.into(),
             sender,
             authenticated_data,
             body,
+        };
+        MlsContentTbs {
+            wire_format,
+            content,
+            serialized_context: <span class="prelude-val">None</span>,
         }
     }
-    <span class="doccomment">/// Adds a serialized context to MlsPlaintextTbs.
+    <span class="doccomment">/// Adds a serialized context to MlsContentTbs.
     /// This consumes the original struct and can be used as a builder function.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>with_context(<span class="kw-2">mut </span><span class="self">self</span>, serialized_context: Vec&lt;u8&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.serialized_context = <span class="prelude-val">Some</span>(serialized_context);
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Create a new signable MlsPlaintext from an existing MlsPlaintext.
-    /// This consumes the existing plaintext.
-    /// To get the `MlsPlaintext` back use `sign`.
-    </span><span class="kw">fn </span>from_plaintext(mls_plaintext: MlsPlaintext) -&gt; <span class="self">Self </span>{
-        MlsPlaintextTbs {
-            wire_format: mls_plaintext.wire_format,
-            serialized_context: <span class="prelude-val">None</span>,
-            group_id: mls_plaintext.content.group_id,
-            epoch: mls_plaintext.content.epoch,
-            sender: mls_plaintext.content.sender,
-            authenticated_data: mls_plaintext.content.authenticated_data,
-            body: mls_plaintext.content.body,
-        }
-    }
-
     <span class="doccomment">/// Get the epoch.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>epoch(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; GroupEpoch {
-        <span class="self">self</span>.epoch
+        <span class="self">self</span>.content.epoch
     }
 }
 
-<span class="kw">impl </span>Verifiable <span class="kw">for </span>VerifiableMlsPlaintext {
+<span class="kw">impl </span>Verifiable <span class="kw">for </span>VerifiableMlsAuthContent {
     <span class="kw">fn </span>unsigned_payload(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, tls_codec::Error&gt; {
         <span class="self">self</span>.tbs.tls_serialize_detached()
     }
 
     <span class="kw">fn </span>signature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Signature {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.signature
+        <span class="kw-2">&amp;</span><span class="self">self</span>.auth.signature
     }
 
     <span class="kw">fn </span>label(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
@@ -1607,21 +1683,12 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Seal;
 }
 
-<span class="kw">impl </span>VerifiedStruct&lt;VerifiableMlsPlaintext&gt; <span class="kw">for </span>MlsPlaintext {
-    <span class="kw">fn </span>from_verifiable(v: VerifiableMlsPlaintext, _seal: <span class="self">Self</span>::SealingType) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>content = MlsContent {
-            group_id: v.tbs.group_id,
-            epoch: v.tbs.epoch,
-            sender: v.tbs.sender,
-            authenticated_data: v.tbs.authenticated_data,
-            body: v.tbs.body,
-        };
-
+<span class="kw">impl </span>VerifiedStruct&lt;VerifiableMlsAuthContent&gt; <span class="kw">for </span>MlsPlaintext {
+    <span class="kw">fn </span>from_verifiable(v: VerifiableMlsAuthContent, _seal: <span class="self">Self</span>::SealingType) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             wire_format: v.tbs.wire_format,
-            content,
-            signature: v.signature,
-            confirmation_tag: v.confirmation_tag,
+            content: v.tbs.content,
+            auth: v.auth,
             membership_tag: v.membership_tag,
         }
     }
@@ -1629,83 +1696,78 @@
     <span class="kw">type </span>SealingType = private_mod::Seal;
 }
 
-<span class="kw">impl </span>SignedStruct&lt;MlsPlaintextTbs&gt; <span class="kw">for </span>MlsPlaintext {
-    <span class="kw">fn </span>from_payload(tbs: MlsPlaintextTbs, signature: Signature) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>content = MlsContent {
-            group_id: tbs.group_id,
-            epoch: tbs.epoch,
-            sender: tbs.sender,
-            authenticated_data: tbs.authenticated_data,
-            body: tbs.body,
-        };
-
-        <span class="self">Self </span>{
-            wire_format: tbs.wire_format,
-            content,
+<span class="kw">impl </span>SignedStruct&lt;MlsContentTbs&gt; <span class="kw">for </span>MlsPlaintext {
+    <span class="kw">fn </span>from_payload(tbs: MlsContentTbs, signature: Signature) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>auth = MlsContentAuthData {
             signature,
             <span class="comment">// Tags must always be added after the signature
             </span>confirmation_tag: <span class="prelude-val">None</span>,
-            membership_tag: <span class="prelude-val">None</span>,
+        };
+        <span class="self">Self </span>{
+            wire_format: tbs.wire_format,
+            content: tbs.content,
+            auth,
+            <span class="comment">// Tags must always be added after the signature
+            </span>membership_tag: <span class="prelude-val">None</span>,
         }
     }
 }
 
-<span class="attribute">#[derive(TlsSerialize, TlsSize)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsPlaintextCommitContent&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="doccomment">/// 9.2 Transcript Hashes
+///
+/// ```c
+/// // draft-ietf-mls-protocol-16
+///
+/// struct {
+///    WireFormat wire_format;
+///    MLSContent content; /* with content_type == commit */
+///    opaque signature&lt;V&gt;;
+///} ConfirmedTranscriptHashInput;
+/// ```
+</span><span class="attribute">#[derive(TlsSerialize, TlsSize)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ConfirmedTranscriptHashInput&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub</span>(<span class="kw">super</span>) wire_format: WireFormat,
-    <span class="kw">pub</span>(<span class="kw">super</span>) group_id: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>GroupId,
-    <span class="kw">pub</span>(<span class="kw">super</span>) epoch: GroupEpoch,
-    <span class="kw">pub</span>(<span class="kw">super</span>) sender: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Sender,
-    <span class="kw">pub</span>(<span class="kw">super</span>) authenticated_data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TlsByteVecU32,
-    <span class="kw">pub</span>(<span class="kw">super</span>) content_type: ContentType,
-    <span class="kw">pub</span>(<span class="kw">super</span>) commit: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Commit,
+    <span class="kw">pub</span>(<span class="kw">super</span>) mls_content: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsContent,
     <span class="kw">pub</span>(<span class="kw">super</span>) signature: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Signature,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext&gt; <span class="kw">for </span>MlsPlaintextCommitContent&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext&gt; <span class="kw">for </span>ConfirmedTranscriptHashInput&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">type </span>Error = <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
     <span class="kw">fn </span>try_from(mls_plaintext: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
-        <span class="kw">let </span>commit = <span class="kw">match </span><span class="kw-2">&amp;</span>mls_plaintext.content.body {
-            MlsContentBody::Commit(commit) =&gt; commit,
-            <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;MlsPlaintext needs to contain a Commit.&quot;</span>),
-        };
-        <span class="prelude-val">Ok</span>(MlsPlaintextCommitContent {
+        <span class="kw">if </span>!<span class="macro">matches!</span>(
+            mls_plaintext.content.body.content_type(),
+            ContentType::Commit
+        ) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;MlsPlaintext needs to contain a Commit.&quot;</span>);
+        }
+        <span class="prelude-val">Ok</span>(ConfirmedTranscriptHashInput {
             wire_format: mls_plaintext.wire_format,
-            group_id: <span class="kw-2">&amp;</span>mls_plaintext.content.group_id,
-            epoch: mls_plaintext.content.epoch,
-            sender: <span class="kw-2">&amp;</span>mls_plaintext.content.sender,
-            authenticated_data: <span class="kw-2">&amp;</span>mls_plaintext.content.authenticated_data,
-            content_type: mls_plaintext.content().content_type(),
-            commit,
-            signature: <span class="kw-2">&amp;</span>mls_plaintext.signature,
+            mls_content: <span class="kw-2">&amp;</span>mls_plaintext.content,
+            signature: <span class="kw-2">&amp;</span>mls_plaintext.auth.signature,
         })
     }
 }
 
 <span class="attribute">#[derive(TlsSerialize, TlsSize)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MlsPlaintextCommitAuthData&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) confirmation_tag: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag&gt;,
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>InterimTranscriptHashInput&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) confirmation_tag: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext&gt; <span class="kw">for </span>MlsPlaintextCommitAuthData&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext&gt; <span class="kw">for </span>InterimTranscriptHashInput&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">type </span>Error = <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
     <span class="kw">fn </span>try_from(mls_plaintext: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MlsPlaintext) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
-        <span class="kw">match </span>mls_plaintext.confirmation_tag.as_ref() {
-            <span class="prelude-val">Some</span>(confirmation_tag) =&gt; <span class="prelude-val">Ok</span>(MlsPlaintextCommitAuthData {
-                confirmation_tag: <span class="prelude-val">Some</span>(confirmation_tag),
-            }),
+        <span class="kw">match </span>mls_plaintext.auth.confirmation_tag.as_ref() {
+            <span class="prelude-val">Some</span>(confirmation_tag) =&gt; <span class="prelude-val">Ok</span>(InterimTranscriptHashInput { confirmation_tag }),
             <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;MLSPlaintext needs to contain a confirmation tag.&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag&gt; <span class="kw">for </span>MlsPlaintextCommitAuthData&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag&gt; <span class="kw">for </span>InterimTranscriptHashInput&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">fn </span>from(confirmation_tag: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>ConfirmationTag) -&gt; <span class="self">Self </span>{
-        MlsPlaintextCommitAuthData {
-            confirmation_tag: <span class="prelude-val">Some</span>(confirmation_tag),
-        }
+        InterimTranscriptHashInput { confirmation_tag }
     }
 }
 </code></pre></div>
