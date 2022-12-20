@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/treesync/diff.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>diff.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../openmls/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../openmls/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../openmls/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `openmls/src/treesync/diff.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>diff.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../openmls/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -902,47 +902,6 @@
 <span id="902">902</span>
 <span id="903">903</span>
 <span id="904">904</span>
-<span id="905">905</span>
-<span id="906">906</span>
-<span id="907">907</span>
-<span id="908">908</span>
-<span id="909">909</span>
-<span id="910">910</span>
-<span id="911">911</span>
-<span id="912">912</span>
-<span id="913">913</span>
-<span id="914">914</span>
-<span id="915">915</span>
-<span id="916">916</span>
-<span id="917">917</span>
-<span id="918">918</span>
-<span id="919">919</span>
-<span id="920">920</span>
-<span id="921">921</span>
-<span id="922">922</span>
-<span id="923">923</span>
-<span id="924">924</span>
-<span id="925">925</span>
-<span id="926">926</span>
-<span id="927">927</span>
-<span id="928">928</span>
-<span id="929">929</span>
-<span id="930">930</span>
-<span id="931">931</span>
-<span id="932">932</span>
-<span id="933">933</span>
-<span id="934">934</span>
-<span id="935">935</span>
-<span id="936">936</span>
-<span id="937">937</span>
-<span id="938">938</span>
-<span id="939">939</span>
-<span id="940">940</span>
-<span id="941">941</span>
-<span id="942">942</span>
-<span id="943">943</span>
-<span id="944">944</span>
-<span id="945">945</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module provides the diff functionality for [`TreeSync`].
 //!
 //! # About
@@ -965,7 +924,7 @@
 </span><span class="kw">use </span>openmls_traits::{types::Ciphersuite, OpenMlsCryptoProvider};
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 
-<span class="kw">use </span>std::{collections::HashSet, convert::TryFrom};
+<span class="kw">use </span>std::collections::HashSet;
 
 <span class="kw">use super</span>::{
     errors::<span class="kw-2">*</span>,
@@ -979,9 +938,7 @@
 };
 
 <span class="kw">use crate</span>::{
-    binary_tree::{
-        array_representation::diff::NodeId, LeafIndex, MlsBinaryTreeDiff, StagedMlsBinaryTreeDiff,
-    },
+    binary_tree::{LeafIndex, MlsBinaryTreeDiff, StagedMlsBinaryTreeDiff},
     ciphersuite::{HpkePrivateKey, HpkePublicKey, Secret},
     credentials::CredentialBundle,
     error::LibraryError,
@@ -1018,14 +975,12 @@
     own_leaf_index: LeafIndex,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TreeSync&gt; <span class="kw">for </span>TreeSyncDiff&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">type </span>Error = TreeSyncDiffError;
-
-    <span class="kw">fn </span>try_from(tree_sync: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TreeSync) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
-        <span class="prelude-val">Ok</span>(TreeSyncDiff {
-            diff: tree_sync.tree.empty_diff()<span class="question-mark">?</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; From&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TreeSync&gt; <span class="kw">for </span>TreeSyncDiff&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>from(tree_sync: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TreeSync) -&gt; <span class="self">Self </span>{
+        TreeSyncDiff {
+            diff: tree_sync.tree.empty_diff(),
             own_leaf_index: tree_sync.own_leaf_index,
-        })
+        }
     }
 }
 
@@ -1041,11 +996,11 @@
         </span><span class="kw">if </span><span class="self">self</span>.leaf_count() == <span class="number">1 </span>{
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
-        <span class="kw">let </span><span class="kw-2">mut </span>leaf_id = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.leaf_count() - <span class="number">1</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>parent_id = <span class="self">self</span>.diff.parent(leaf_id)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>leaf_index = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.leaf_count() - <span class="number">1</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>parent_index = <span class="self">self</span>.diff.parent(leaf_index)<span class="question-mark">?</span>;
         <span class="comment">// Trim only if the parent node is blank as well;.
-        </span><span class="kw">while </span><span class="self">self</span>.diff.node(leaf_id)<span class="question-mark">?</span>.node().is_none()
-            &amp;&amp; <span class="self">self</span>.diff.node(parent_id)<span class="question-mark">?</span>.node().is_none()
+        </span><span class="kw">while </span><span class="self">self</span>.diff.node(leaf_index)<span class="question-mark">?</span>.node().is_none()
+            &amp;&amp; <span class="self">self</span>.diff.node(parent_index)<span class="question-mark">?</span>.node().is_none()
         {
             <span class="self">self</span>.diff.remove_leaf()<span class="question-mark">?</span>;
             <span class="comment">// If there&#39;s only one leaf left, it won&#39;t have a parent, so we&#39;ll
@@ -1053,8 +1008,8 @@
             </span><span class="kw">if </span><span class="self">self</span>.leaf_count() == <span class="number">1 </span>{
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
-            leaf_id = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.leaf_count() - <span class="number">1</span>)<span class="question-mark">?</span>;
-            parent_id = <span class="self">self</span>.diff.parent(leaf_id)<span class="question-mark">?</span>;
+            leaf_index = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.leaf_count() - <span class="number">1</span>);
+            parent_index = <span class="self">self</span>.diff.parent(leaf_index)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
@@ -1084,28 +1039,18 @@
 
     <span class="doccomment">/// Find and return the index of either the left-most blank leaf, or, if
     /// there are no blank leaves, the leaf count.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>free_leaf_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;LeafIndex, LibraryError&gt; {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>free_leaf_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LeafIndex {
         <span class="comment">// Find a free leaf and fill it with the new key package.
-        </span><span class="kw">let </span>leaf_ids = <span class="self">self</span>.diff.leaves()<span class="question-mark">?</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>leaf_index_option = <span class="prelude-val">None</span>;
-        <span class="kw">for </span>(leaf_index, leaf_id) <span class="kw">in </span>leaf_ids.iter().enumerate() {
-            <span class="kw">let </span>leaf_index: LeafIndex = u32::try_from(leaf_index)
-                .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Could not convert index&quot;</span>))<span class="question-mark">?</span>;
-            <span class="comment">// The leaf ID must be valid, since it is one of the leaves of the tree
-            </span><span class="kw">if </span><span class="self">self
-                </span>.diff
-                .node(<span class="kw-2">*</span>leaf_id)
-                .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected a valid leaf ID&quot;</span>))<span class="question-mark">?
-                </span>.node()
-                .is_none()
-            {
+        </span><span class="kw">let </span><span class="kw-2">mut </span>leaf_index_option = <span class="prelude-val">None</span>;
+        <span class="kw">for </span>(leaf_index, leaf_id) <span class="kw">in </span><span class="self">self</span>.diff.leaves() {
+            <span class="kw">if </span>leaf_id.node().is_none() {
                 leaf_index_option = <span class="prelude-val">Some</span>(leaf_index);
                 <span class="kw">break</span>;
             }
         }
         <span class="comment">// If we found a free leaf, replace it with the new one, otherwise
         // extend the tree.
-        </span><span class="prelude-val">Ok</span>(leaf_index_option.unwrap_or_else(|| <span class="self">self</span>.leaf_count()))
+        </span>leaf_index_option.unwrap_or_else(|| <span class="self">self</span>.leaf_count())
     }
 
     <span class="doccomment">/// Adds a new leaf to the tree either by filling a blank leaf or by
@@ -1121,7 +1066,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;LeafIndex, TreeSyncAddLeaf&gt; {
         <span class="kw">let </span>node = Node::LeafNode(leaf_node);
         <span class="comment">// Find a free leaf and fill it with the new key package.
-        </span><span class="kw">let </span>leaf_index = <span class="self">self</span>.free_leaf_index()<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>leaf_index = <span class="self">self</span>.free_leaf_index();
         <span class="comment">// If the free leaf index is within the tree, put the new leaf there,
         // otherwise extend the tree.
         </span><span class="kw">if </span>leaf_index &lt; <span class="self">self</span>.leaf_count() {
@@ -1136,7 +1081,7 @@
         }
         <span class="comment">// Add new unmerged leaves entry to all nodes in direct path. Also, wipe
         // the cached tree hash.
-        </span><span class="kw">for </span>node_id <span class="kw">in </span><span class="self">self
+        </span><span class="kw">for </span>node_index <span class="kw">in </span><span class="self">self
             </span>.diff
             .direct_path(leaf_index)
             <span class="comment">// We checked the leaf index is in the tree
@@ -1145,7 +1090,7 @@
             <span class="comment">// We know that the nodes from the direct path are in the tree
             </span><span class="kw">let </span>tsn = <span class="self">self
                 </span>.diff
-                .node_mut(node_id)
+                .node_mut(node_index)
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected a node&quot;</span>))<span class="question-mark">?</span>;
             <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>node) = tsn.node_mut() {
                 <span class="comment">// We know that nodes in the direct path are always parent nodes
@@ -1166,11 +1111,7 @@
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Root was not in tree.&quot;</span>))<span class="question-mark">?
             </span>.erase_tree_hash();
         <span class="self">self</span>.diff
-            .node_mut(
-                <span class="self">self</span>.diff
-                    .leaf(<span class="self">self</span>.own_leaf_index())
-                    .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Node was not in tree.&quot;</span>))<span class="question-mark">?</span>,
-            )
+            .node_mut(<span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index()))
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Node was not in tree.&quot;</span>))<span class="question-mark">?
             </span>.erase_tree_hash();
         <span class="prelude-val">Ok</span>(())
@@ -1197,17 +1138,18 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Derive a new direct path for our own leaf from the given `leaf_secret`.
+    <span class="doccomment">/// Derive a new direct path for our own leaf.
     ///
     /// Returns an error if the own leaf is not in the tree
-    </span><span class="kw">fn </span>derive_path_from_leaf_secret(
+    </span><span class="kw">fn </span>derive_path(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         ciphersuite: Ciphersuite,
-        leaf_secret: Secret,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;PathDerivationResult, LibraryError&gt; {
-        <span class="kw">let </span>leaf_path_secret = PathSecret::from(leaf_secret);
-        <span class="kw">let </span>path_secret = leaf_path_secret.derive_path_secret(backend, ciphersuite)<span class="question-mark">?</span>;
+        <span class="kw">let </span>path_secret = PathSecret::from(
+            Secret::random(ciphersuite, backend, <span class="prelude-val">None</span>)
+                .map_err(LibraryError::unexpected_crypto_error)<span class="question-mark">?</span>,
+        );
 
         <span class="kw">let </span>path_length = <span class="self">self
             </span>.diff
@@ -1235,19 +1177,8 @@
         credential_bundle: <span class="kw-2">&amp;</span>CredentialBundle,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;UpdatePathResult, LibraryError&gt; {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.own_leaf().is_ok(), <span class="string">&quot;Tree diff is missing own leaf&quot;</span>);
-        <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.own_leaf().unwrap().leaf_secret().is_some(),
-            <span class="string">&quot;Own leaf is missing leaf secret&quot;
-        </span>);
-        <span class="kw">let </span>leaf_secret = <span class="self">self
-            </span>.own_leaf_mut()
-            .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Didn&#39;t find own leaf in diff.&quot;</span>))<span class="question-mark">?
-            </span>.leaf_secret()
-            .ok_or_else(|| LibraryError::custom(<span class="string">&quot;No leaf secret found for update path.&quot;</span>))<span class="question-mark">?
-            </span>.clone();
 
-        <span class="kw">let </span>(path, update_path_nodes, commit_secret) =
-            <span class="self">self</span>.derive_path_from_leaf_secret(backend, ciphersuite, leaf_secret)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(path, update_path_nodes, commit_secret) = <span class="self">self</span>.derive_path(backend, ciphersuite)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>parent_hash =
             <span class="self">self</span>.process_update_path(backend, ciphersuite, <span class="self">self</span>.own_leaf_index, path)<span class="question-mark">?</span>;
@@ -1350,11 +1281,11 @@
             </span>.diff
             .subtree_path(<span class="self">self</span>.own_leaf_index, sender_index)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected both nodes to be in the tree&quot;</span>))<span class="question-mark">?</span>;
-        <span class="kw">for </span>node_id <span class="kw">in </span>subtree_path {
+        <span class="kw">for </span>node_index <span class="kw">in </span>subtree_path {
             <span class="comment">// We know the node is in the diff, since it is in the subtree path
             </span><span class="kw">let </span>tsn = <span class="self">self
                 </span>.diff
-                .node_mut(node_id)
+                .node_mut(node_index)
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected the node to be in the diff&quot;</span>))<span class="question-mark">?</span>;
             <span class="comment">// We only care about non-blank nodes.
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>node) = tsn.node_mut() {
@@ -1396,13 +1327,9 @@
         resolution: <span class="kw-2">&amp;mut </span>Vec&lt;HpkePublicKey&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), LibraryError&gt; {
         <span class="kw">for </span>leaf_index <span class="kw">in </span>parent_node.unmerged_leaves() {
-            <span class="kw">let </span>leaf_id = <span class="self">self
-                </span>.diff
-                .leaf(<span class="kw-2">*</span>leaf_index)
-                .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Unmerged leaf not in tree&quot;</span>))<span class="question-mark">?</span>;
             <span class="kw">let </span>leaf = <span class="self">self
                 </span>.diff
-                .node(leaf_id)
+                .node(<span class="self">self</span>.diff.leaf(<span class="kw-2">*</span>leaf_index))
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Unmerged leaf not in tree&quot;</span>))<span class="question-mark">?</span>;
             <span class="comment">// All unmerged leaves should be non-blank.
             </span><span class="kw">let </span>leaf_node = leaf
@@ -1478,18 +1405,18 @@
     /// In case node_id is not in the tree a LibraryError is returned.
     </span><span class="kw">fn </span>resolution(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        node_id: NodeId,
+        node_index: u32,
         excluded_indices: <span class="kw-2">&amp;</span>HashSet&lt;<span class="kw-2">&amp;</span>LeafIndex&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;HpkePublicKey&gt;, LibraryError&gt; {
         <span class="comment">// First, check if the node is blank or not.
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(node) = <span class="self">self
             </span>.diff
-            .node(node_id)
+            .node(node_index)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in the tree&quot;</span>))<span class="question-mark">?
             </span>.node()
         {
             <span class="comment">// If it&#39;s a full node, check if it&#39;s a leaf.
-            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(leaf_index) = <span class="self">self</span>.diff.leaf_index(node_id) {
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(leaf_index) = <span class="self">self</span>.diff.leaf_index(node_index) {
                 <span class="comment">// If the node is a leaf, check if it is in the exclusion list.
                 </span><span class="kw">if </span>excluded_indices.contains(<span class="kw-2">&amp;</span>leaf_index) {
                     <span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[])
@@ -1508,13 +1435,9 @@
                     </span>.unmerged_leaves()
                 {
                     <span class="kw">if </span>!excluded_indices.contains(leaf_index) {
-                        <span class="kw">let </span>leaf_id = <span class="self">self
-                            </span>.diff
-                            .leaf(<span class="kw-2">*</span>leaf_index)
-                            .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected leaf to be in the tree&quot;</span>))<span class="question-mark">?</span>;
                         <span class="kw">let </span>leaf = <span class="self">self
                             </span>.diff
-                            .node(leaf_id)
+                            .node(<span class="self">self</span>.diff.leaf(<span class="kw-2">*</span>leaf_index))
                             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in the tree&quot;</span>))<span class="question-mark">?</span>;
                         <span class="comment">// TODO #800: unmerged leaves should be checked
                         </span><span class="kw">let </span>leaf_node = leaf
@@ -1528,7 +1451,7 @@
             }
         } <span class="kw">else </span>{
             <span class="comment">// If it&#39;s a blank, also check if it&#39;s a leaf
-            </span><span class="kw">if </span><span class="self">self</span>.diff.is_leaf(node_id) {
+            </span><span class="kw">if </span><span class="self">self</span>.diff.is_leaf(node_index) {
                 <span class="comment">// If it is, just return an empty vector.
                 </span><span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[])
             } <span class="kw">else </span>{
@@ -1536,11 +1459,11 @@
                 </span><span class="kw">let </span><span class="kw-2">mut </span>resolution = Vec::new();
                 <span class="kw">let </span>left_child = <span class="self">self
                     </span>.diff
-                    .left_child(node_id)
+                    .left_child(node_index)
                     .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected a parent node&quot;</span>))<span class="question-mark">?</span>;
                 <span class="kw">let </span>right_child = <span class="self">self
                     </span>.diff
-                    .right_child(node_id)
+                    .right_child(node_index)
                     .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected a parent node&quot;</span>))<span class="question-mark">?</span>;
                 resolution.append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.resolution(left_child, excluded_indices)<span class="question-mark">?</span>);
                 resolution.append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.resolution(right_child, excluded_indices)<span class="question-mark">?</span>);
@@ -1562,11 +1485,7 @@
         leaf_index: LeafIndex,
         excluded_indices: <span class="kw-2">&amp;</span>HashSet&lt;<span class="kw-2">&amp;</span>LeafIndex&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Vec&lt;HpkePublicKey&gt;&gt;, LibraryError&gt; {
-        <span class="kw">let </span>leaf = <span class="self">self
-            </span>.diff
-            .leaf(leaf_index)
-            .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected leaf to be in tree&quot;</span>))<span class="question-mark">?</span>;
-
+        <span class="kw">let </span>leaf = <span class="self">self</span>.diff.leaf(leaf_index);
         <span class="comment">// If we&#39;re the only node in the tree, there&#39;s no copath.
         </span><span class="kw">if </span>leaf == <span class="self">self</span>.diff.root() {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]);
@@ -1587,11 +1506,11 @@
         full_path.append(<span class="kw-2">&amp;mut </span>direct_path);
 
         <span class="kw">let </span><span class="kw-2">mut </span>copath_resolutions = Vec::new();
-        <span class="kw">for </span>node_id <span class="kw">in </span><span class="kw-2">&amp;</span>full_path {
+        <span class="kw">for </span>node_index <span class="kw">in </span><span class="kw-2">&amp;</span>full_path {
             <span class="comment">// If sibling is not a blank, return its HpkePublicKey.
             </span><span class="kw">let </span>sibling_id = <span class="self">self
                 </span>.diff
-                .sibling(<span class="kw-2">*</span>node_id)
+                .sibling(<span class="kw-2">*</span>node_index)
                 <span class="comment">// The root should not be there anymore, hence sibling cannot fail
                 </span>.map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected root to be removed&quot;</span>))<span class="question-mark">?</span>;
             <span class="kw">let </span>resolution = <span class="self">self</span>.resolution(sibling_id, excluded_indices)<span class="question-mark">?</span>;
@@ -1610,22 +1529,22 @@
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         ciphersuite: Ciphersuite,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), TreeSyncParentHashError&gt; {
-        <span class="kw">for </span>node_id <span class="kw">in </span><span class="self">self</span>.diff.iter() {
+        <span class="kw">for </span>node_index <span class="kw">in </span><span class="self">self</span>.diff.iter() {
             <span class="comment">// Continue early if node is blank.
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(Node::ParentNode(parent_node)) = <span class="self">self
                 </span>.diff
-                .node(node_id)
+                .node(node_index)
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Node not in tree&quot;</span>))<span class="question-mark">?
                 </span>.node()
             {
                 <span class="comment">// We don&#39;t care about leaf nodes.
                 </span><span class="kw">let </span>left_child_id = <span class="self">self
                     </span>.diff
-                    .left_child(node_id)
+                    .left_child(node_index)
                     .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected parent node&quot;</span>))<span class="question-mark">?</span>;
                 <span class="kw">let </span><span class="kw-2">mut </span>right_child_id = <span class="self">self
                     </span>.diff
-                    .right_child(node_id)
+                    .right_child(node_index)
                     .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected parent node&quot;</span>))<span class="question-mark">?</span>;
                 <span class="comment">// If the left child is blank, we continue with the next step
                 // in the verification algorithm.
@@ -1731,13 +1650,13 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         backend: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenMlsCryptoProvider,
         ciphersuite: Ciphersuite,
-        node_id: NodeId,
+        node_index: u32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, LibraryError&gt; {
         <span class="comment">// Check if this is a leaf.
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(leaf_index) = <span class="self">self</span>.diff.leaf_index(node_id) {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(leaf_index) = <span class="self">self</span>.diff.leaf_index(node_index) {
             <span class="kw">let </span>leaf = <span class="self">self
                 </span>.diff
-                .node_mut(node_id)
+                .node_mut(node_index)
                 .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in tree&quot;</span>))<span class="question-mark">?</span>;
             <span class="kw">let </span>tree_hash =
                 leaf.compute_tree_hash(backend, ciphersuite, <span class="prelude-val">Some</span>(leaf_index), <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
@@ -1755,19 +1674,19 @@
         // Compute left hash.
         </span><span class="kw">let </span>left_child = <span class="self">self
             </span>.diff
-            .left_child(node_id)
+            .left_child(node_index)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in tree&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw">let </span>left_hash = <span class="self">self</span>.compute_tree_hash(backend, ciphersuite, left_child)<span class="question-mark">?</span>;
         <span class="comment">// Compute right hash.
         </span><span class="kw">let </span>right_child = <span class="self">self
             </span>.diff
-            .right_child(node_id)
+            .right_child(node_index)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in tree&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw">let </span>right_hash = <span class="self">self</span>.compute_tree_hash(backend, ciphersuite, right_child)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>node = <span class="self">self
             </span>.diff
-            .node_mut(node_id)
+            .node_mut(node_index)
             .map_err(|<span class="kw">_</span>| LibraryError::custom(<span class="string">&quot;Expected node to be in tree&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw">let </span>tree_hash =
             node.compute_tree_hash(backend, ciphersuite, <span class="prelude-val">None</span>, left_hash, right_hash)<span class="question-mark">?</span>;
@@ -1782,8 +1701,8 @@
 
     <span class="doccomment">/// Return a reference to our own leaf.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>own_leaf(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>OpenMlsLeafNode, TreeSyncDiffError&gt; {
-        <span class="kw">let </span>leaf_id = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index)<span class="question-mark">?</span>;
-        <span class="kw">let </span>node = <span class="self">self</span>.diff.node(leaf_id)<span class="question-mark">?</span>;
+        <span class="kw">let </span>node_index = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index);
+        <span class="kw">let </span>node = <span class="self">self</span>.diff.node(node_index)<span class="question-mark">?</span>;
         <span class="kw">match </span>node.node() {
             <span class="prelude-val">Some</span>(node) =&gt; <span class="prelude-val">Ok</span>(node.as_leaf_node()<span class="question-mark">?</span>),
             <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(LibraryError::custom(<span class="string">&quot;Node was empty.&quot;</span>).into()),
@@ -1792,8 +1711,8 @@
 
     <span class="doccomment">/// Return a mutable reference to our own leaf.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>own_leaf_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;mut </span>OpenMlsLeafNode, TreeSyncDiffError&gt; {
-        <span class="kw">let </span>leaf_id = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index)<span class="question-mark">?</span>;
-        <span class="kw">let </span>node = <span class="self">self</span>.diff.node_mut(leaf_id)<span class="question-mark">?</span>;
+        <span class="kw">let </span>node_index = <span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index);
+        <span class="kw">let </span>node = <span class="self">self</span>.diff.node_mut(node_index)<span class="question-mark">?</span>;
         <span class="kw">match </span>node.node_mut() {
             <span class="prelude-val">Some</span>(node) =&gt; <span class="prelude-val">Ok</span>(node.as_leaf_node_mut()<span class="question-mark">?</span>),
             <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(LibraryError::custom(<span class="string">&quot;Node was empty.&quot;</span>).into()),
@@ -1848,7 +1767,7 @@
         <span class="comment">// Get all of the public keys that we have secret keys for, i.e. our own
         // leaf pk, as well as potentially a number of public keys from our
         // direct path.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>own_node_ids = <span class="macro">vec!</span>[<span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index)<span class="question-mark">?</span>];
+        </span><span class="kw">let </span><span class="kw-2">mut </span>own_node_ids = <span class="macro">vec!</span>[<span class="self">self</span>.diff.leaf(<span class="self">self</span>.own_leaf_index)];
 
         own_node_ids.append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.diff.direct_path(<span class="self">self</span>.own_leaf_index)<span class="question-mark">?</span>);
         <span class="kw">for </span>node_id <span class="kw">in </span>own_node_ids {
@@ -1876,9 +1795,8 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>export_nodes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="prelude-ty">Option</span>&lt;Node&gt;&gt;, LibraryError&gt; {
         <span class="kw">let </span>nodes = <span class="self">self
             </span>.diff
-            .export_nodes()<span class="question-mark">?
-            </span>.into_iter()
-            .map(|ts_node| ts_node.node().to_owned())
+            .nodes()
+            .map(|(<span class="kw">_</span>, ts_node)| ts_node.node().to_owned())
             .collect();
         <span class="prelude-val">Ok</span>(nodes)
     }
@@ -1889,4 +1807,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="openmls" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="openmls" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>

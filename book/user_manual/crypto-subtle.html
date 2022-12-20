@@ -4,7 +4,10 @@
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
         <title>crypto-subtle feature - OpenMLS Book</title>
+
+
         <!-- Custom HTML head -->
+        
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
@@ -15,15 +18,18 @@
         <link rel="stylesheet" href="../css/general.css">
         <link rel="stylesheet" href="../css/chrome.css">
         <link rel="stylesheet" href="../css/print.css" media="print">
+
         <!-- Fonts -->
         <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
         <link rel="stylesheet" href="../fonts/fonts.css">
+
         <!-- Highlight.js Stylesheets -->
         <link rel="stylesheet" href="../highlight.css">
         <link rel="stylesheet" href="../tomorrow-night.css">
         <link rel="stylesheet" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
+
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -82,7 +88,7 @@
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
+                                <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky bordered">
                     <div class="left-buttons">
                         <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
@@ -109,6 +115,7 @@
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
+
                     </div>
                 </div>
 
@@ -122,6 +129,7 @@
                         </ul>
                     </div>
                 </div>
+
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
                     document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
@@ -136,7 +144,7 @@
                         <h1 id="crypto-subtle-feature"><a class="header" href="#crypto-subtle-feature">crypto-subtle feature</a></h1>
 <p>This feature of the OpenMLS crate allows importing and exporting private signature keys that can be used with credentials.</p>
 <p>⚠️ Note that no checks are performed on the keys. Use this feature at your own risk. If you create a credential from an existing key
-or export key material, you are responsible for deleting that key. If that key is kept outside OpenMLS, 
+or export key material, you are responsible for deleting that key. If that key is kept outside OpenMLS,
 updating a leaf will not be enough to achieve Forward Secrecy/Post-compromise Security.</p>
 <h2 id="importing-keys"><a class="header" href="#importing-keys">Importing keys</a></h2>
 <p>A signature keypair can be created from existing raw keys with the following function call:</p>
@@ -156,7 +164,7 @@ let public_key = vec![4, 5, 6]; // Sample public key as raw bytes
 
 let identity = vec![7, 8, 9]; // Sample identity
 
-let signature_keypair 
+let signature_keypair
     = SignatureKeypair::from_bytes(signature_scheme, public_key, private_key);
 
 let credential_bundle = CredentialBundle::from_parts(identity, signature_keypair);</code></pre>
@@ -168,9 +176,11 @@ let credential_bundle = CredentialBundle::from_parts(identity, signature_keypair
                             <a rel="prev" href="../user_manual/persistence.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
+
                             <a rel="next" href="../traits/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
+
                         <div style="clear: both"></div>
                     </nav>
                 </div>
@@ -180,6 +190,7 @@ let credential_bundle = CredentialBundle::from_parts(identity, signature_keypair
                     <a rel="prev" href="../user_manual/persistence.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
+
                     <a rel="next" href="../traits/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
@@ -187,16 +198,24 @@ let credential_bundle = CredentialBundle::from_parts(identity, signature_keypair
 
         </div>
 
+
+
+
         <script>
             window.playground_copyable = true;
         </script>
+
+
         <script src="../elasticlunr.min.js"></script>
         <script src="../mark.min.js"></script>
         <script src="../searcher.js"></script>
+
         <script src="../clipboard.min.js"></script>
         <script src="../highlight.js"></script>
         <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
+
+
     </body>
 </html>
